@@ -1,0 +1,46 @@
+{
+  "name": "window-door-store-mobile",
+  "private": true,
+  "version": "0.1.0",
+  "main": "./index.tsx",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@expo-google-fonts/roboto": "^0.2.3",
+    "@expo/metro-runtime": "~4.0.1",
+    "@react-native-async-storage/async-storage": "^1.23.1",
+    "@react-native-masked-view/masked-view": "0.3.2",
+    "@react-navigation/bottom-tabs": "^7.2.0",
+    "@react-navigation/native": "^7.0.14",
+    "@react-navigation/native-stack": "^7.2.0",
+    "@tanstack/react-query": "^5.66.9",
+    "expo": "~52.0.37",
+    "expo-asset": "~11.0.5",
+    "expo-auth-session": "6.0.3",
+    "expo-blur": "~14.0.3",
+    "expo-font": "~12.0.10",
+    "expo-linear-gradient": "~14.0.2",
+    "expo-localization": "~16.0.1",
+    "expo-notifications": "~0.29.14",
+    "expo-status-bar": "~2.0.1",
+    "expo-web-browser": "~14.0.2",
+    "firebase": "^11.3.1",
+    "i18next": "^25.0.2",
+    "react": "18.3.1",
+    "react-i18next": "^15.4.1",
+    "react-native": "0.76.9",
+    "react-native-gesture-handler": "~2.20.2",
+    "react-native-safe-area-context": "4.12.0",
+    "react-native-screens": "~4.4.0",
+    "react-native-web": "~0.19.13",
+    "window-door-store-calc-engine": "git+https://github.com/vonomarap/calc-engine.git#main"
+  },
+  "devDependencies": {
+    "@types/react": "~18.3.12",
+    "typescript": "^5.9.3"
+  }
+}
