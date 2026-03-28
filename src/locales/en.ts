@@ -41,7 +41,17 @@ export const en = {
     ctaEyebrow: "Next step",
     ctaTitle: "If the direction is already clear, move straight to the estimate",
     ctaSubtitle: "The catalog helps people choose, while the calculator quickly turns interest into a request.",
-    ctaPrimary: "Go to estimate"
+    ctaPrimary: "Go to estimate",
+    featuresEyebrow: "Why choose us",
+    featuresTitle: "Trusted by homeowners and professionals",
+    feature1Title: "Factory direct",
+    feature1Text: "We work directly with the manufacturer — no middlemen.",
+    feature2Title: "Professional install",
+    feature2Text: "Certified teams handle measurement and installation.",
+    feature3Title: "Fast delivery",
+    feature3Text: "In-stock products ship within days, not weeks.",
+    feature4Title: "Full warranty",
+    feature4Text: "Every product backed by manufacturer warranty and support."
   },
   tabs: {
     home: "Home",
