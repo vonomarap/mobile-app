@@ -8,12 +8,12 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Image, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { Card } from "../components/Card";
+import { GlowPressable } from "../components/GlowPressable";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { AppScrollView } from "../components/AppScrollView";
 import { SiteFooter } from "../components/SiteFooter";
 import { PromoBanners } from "../components/PromoBanners";
 import { OfficialPartnerBlock } from "../components/OfficialPartnerBlock";
-import { GlowPressable } from "../components/GlowPressable";
 import type { RootStackParamList } from "../navigation/types";
 import { useCurrency } from "../services/currency-context";
 import { fetchProducts, type Product } from "../services/storefront";
@@ -23,217 +23,281 @@ import { radius, spacing } from "../theme/tokens";
 import { useTheme } from "../theme/ThemeProvider";
 import { formatMoney } from "../utils/money";
 
-type HomeNavigation = NativeStackNavigationProp<RootStackParamList, "Home">;
+type Nav = NativeStackNavigationProp<RootStackParamList, "Home">;
 
-function formatProductPrice(item: Product, currency: string, t: (key: string) => string): string {
-  return Number.isFinite(item.priceFrom) && (item.priceFrom ?? 0) > 0
-    ? `${t("product.priceFrom")} ${formatMoney(item.priceFrom as number, currency)}`
+/* ───────── helpers ───────── */
+
+function fmtPrice(p: Product, cur: string, t: (k: string) => string): string {
+  return Number.isFinite(p.priceFrom) && (p.priceFrom ?? 0) > 0
+    ? `${t("product.priceFrom")} ${formatMoney(p.priceFrom as number, cur)}`
     : t("product.priceOnRequest");
 }
 
-/* ---------- Feature highlight data ---------- */
+/* ───────── static data ───────── */
+
+const STATS = [
+  { valueKey: "home.stat1Value", labelKey: "home.stat1Label", icon: "briefcase-outline" as const },
+  { valueKey: "home.stat2Value", labelKey: "home.stat2Label", icon: "time-outline" as const },
+  { valueKey: "home.stat3Value", labelKey: "home.stat3Label", icon: "headset-outline" as const },
+  { valueKey: "home.stat4Value", labelKey: "home.stat4Label", icon: "shield-checkmark-outline" as const },
+];
+
 const FEATURES = [
-  { icon: "shield-checkmark-outline" as const, titleKey: "home.feature1Title", textKey: "home.feature1Text" },
+  { icon: "business-outline" as const, titleKey: "home.feature1Title", textKey: "home.feature1Text" },
   { icon: "construct-outline" as const, titleKey: "home.feature2Title", textKey: "home.feature2Text" },
-  { icon: "car-outline" as const, titleKey: "home.feature3Title", textKey: "home.feature3Text" },
+  { icon: "rocket-outline" as const, titleKey: "home.feature3Title", textKey: "home.feature3Text" },
   { icon: "ribbon-outline" as const, titleKey: "home.feature4Title", textKey: "home.feature4Text" },
 ];
+
+/* ═══════════════════════════════════════════════
+   HOME SCREEN
+   ═══════════════════════════════════════════════ */
 
 export function HomeScreen(): JSX.Element {
   const { t } = useTranslation();
   const theme = useTheme();
   const currency = useCurrency();
-  const navigation = useNavigation<HomeNavigation>();
+  const nav = useNavigation<Nav>();
   const { width } = useWindowDimensions();
   const isWeb = Platform.OS === "web";
 
+  /* layout tokens */
   const gutter = width < 420 ? spacing.sm : spacing.md;
-  const heroSplit = width >= 920;
-  const productCardWidth = width >= 1060 ? "31.8%" : width >= 700 ? "48.5%" : "100%";
-  const featureCardWidth = width >= 900 ? "23%" : width >= 600 ? "48%" : "100%";
+  const heroSplit = width >= 860;
+  const statsWrap = width < 700;
+  const featureCols = width >= 900 ? 4 : width >= 540 ? 2 : 1;
+  const productCols = width >= 1060 ? 3 : width >= 700 ? 2 : 1;
 
-  const productsQuery = useQuery({
+  /* queries */
+  const productsQ = useQuery({
     queryKey: ["home", "products"],
     queryFn: fetchProducts,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
     refetchOnWindowFocus: false,
   });
-
-  const settingsQuery = useQuery({
+  const settingsQ = useQuery({
     queryKey: ["app_settings", "site"],
     queryFn: fetchSiteSettings,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 5 * 60_000,
     enabled: isWeb,
   });
 
-  const featuredProducts = useMemo(() => (productsQuery.data ?? []).slice(0, 3), [productsQuery.data]);
-  const heroProduct = featuredProducts[0];
-  const heroPrice = heroProduct ? formatProductPrice(heroProduct, currency, t) : t("home.heroFallbackMeta");
+  const featured = useMemo(() => (productsQ.data ?? []).slice(0, 3), [productsQ.data]);
+  const hero = featured[0];
+  const heroPrice = hero ? fmtPrice(hero, currency, t) : t("home.heroFallbackPrice");
 
-  const heroText = theme.isDark ? "#FFF7ED" : "#442515";
-  const heroSubtle = theme.isDark ? "rgba(255,247,237,0.78)" : "rgba(68,37,21,0.76)";
-  const heroBorder = theme.isDark ? "rgba(255,255,255,0.10)" : "rgba(122,79,48,0.14)";
-  const sectionEyebrowColor = theme.isDark ? "#FDBA74" : "#B45309";
-  const accentGlow = theme.isDark ? "rgba(249,115,22,0.35)" : "rgba(234,88,12,0.18)";
+  /* palette shortcuts */
+  const isDark = theme.isDark;
+  const heroText = isDark ? "#FFF7ED" : "#3B1A08";
+  const heroMuted = isDark ? "rgba(255,247,237,0.72)" : "rgba(59,26,8,0.64)";
+  const heroBorder = isDark ? "rgba(255,255,255,0.10)" : "rgba(122,79,48,0.12)";
+  const sectionKicker = isDark ? "#FDBA74" : "#B45309";
+  const glassAccent = isDark ? "rgba(249,115,22,0.22)" : "rgba(234,88,12,0.10)";
+  const statDivider = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)";
+
+  /* card width helpers */
+  const featureWidth = featureCols === 4 ? "23.5%" : featureCols === 2 ? "48%" : "100%";
+  const productWidth = productCols === 3 ? "31.8%" : productCols === 2 ? "48.5%" : "100%";
 
   return (
     <ScreenContainer>
-      <AppScrollView trackNavGlass contentContainerStyle={[styles.page, { paddingHorizontal: gutter, paddingBottom: 0 }]} showsVerticalScrollIndicator={false}>
-
-        {/* ── HERO ── */}
+      <AppScrollView
+        trackNavGlass
+        contentContainerStyle={[styles.page, { paddingHorizontal: gutter, paddingBottom: 0 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ╔══════════════════════════════╗
+            ║  1 · HERO                    ║
+            ╚══════════════════════════════╝ */}
         <LinearGradient
-          colors={theme.isDark ? (["#151517", "#211913", "#3C2617"] as const) : (["#F7EFE8", "#EEDFD0", "#D8B89B"] as const)}
+          colors={isDark
+            ? (["#131315", "#1E1510", "#3A2414"] as const)
+            : (["#FEF7F0", "#FCEADB", "#F4C9A0"] as const)}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[styles.heroShell, { borderColor: heroBorder }]}
         >
-          {/* Decorative corner glow */}
-          <View pointerEvents="none" style={[styles.heroDecorCircle, { backgroundColor: accentGlow }]} />
+          {/* decorative blobs */}
+          <View pointerEvents="none" style={[styles.blob1, { backgroundColor: isDark ? "rgba(249,115,22,0.18)" : "rgba(251,146,60,0.22)" }]} />
+          <View pointerEvents="none" style={[styles.blob2, { backgroundColor: isDark ? "rgba(253,186,116,0.10)" : "rgba(234,88,12,0.10)" }]} />
 
-          <View style={[styles.heroGrid, heroSplit ? styles.heroGridSplit : null]}>
+          <View style={[styles.heroInner, heroSplit && styles.heroSplit]}>
+            {/* left copy */}
             <View style={styles.heroCopy}>
-              <View style={[styles.kickerPill, { borderColor: heroBorder, backgroundColor: theme.isDark ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.56)" }]}>
-                <Ionicons name="sparkles-outline" size={14} color={heroText} />
-                <Text style={[styles.kickerText, { color: heroText }]}>{t("home.kicker")}</Text>
+              <View style={[styles.kickerPill, { borderColor: heroBorder, backgroundColor: isDark ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.60)" }]}>
+                <Ionicons name="diamond-outline" size={13} color={heroText} />
+                <Text style={[styles.kickerLabel, { color: heroText }]}>{t("home.heroKicker")}</Text>
               </View>
 
-              <Text style={[styles.heroTitle, { color: heroText }]}>{t("home.title")}</Text>
-              <Text style={[styles.heroSubtitle, { color: heroSubtle }]}>{t("home.subtitle")}</Text>
+              <Text style={[styles.heroH1, { color: heroText }]}>{t("home.heroTitle")}</Text>
+              <Text style={[styles.heroP, { color: heroMuted }]}>{t("home.heroSubtitle")}</Text>
 
-              <View style={styles.heroActions}>
+              <View style={styles.heroBtns}>
                 <PrimaryButton
-                  title={t("home.openCalculator")}
-                  onPress={() => navigation.navigate("Calculator")}
-                  leftSlot={<Ionicons name="calculator-outline" size={18} color="#FFFFFF" />}
-                  buttonStyle={styles.primaryAction}
+                  title={t("home.heroCta")}
+                  onPress={() => nav.navigate("Calculator")}
+                  leftSlot={<Ionicons name="calculator-outline" size={18} color="#FFF" />}
+                  buttonStyle={styles.heroBtn}
                 />
                 <PrimaryButton
-                  title={t("home.browseCatalog")}
+                  title={t("home.heroCtaSecondary")}
                   tone="soft"
-                  onPress={() => navigation.navigate("Catalog")}
+                  onPress={() => nav.navigate("Catalog")}
                   leftSlot={<Ionicons name="grid-outline" size={18} color={theme.colors.primary} />}
-                  buttonStyle={styles.secondaryAction}
+                  buttonStyle={styles.heroBtn2}
                 />
               </View>
             </View>
 
-            <Card variant="solid" padded={false} style={[styles.heroCard, { backgroundColor: theme.colors.surface, borderColor: heroBorder }]}>
-              <View style={styles.heroMedia}>
-                {heroProduct?.image ? (
-                  <Image source={{ uri: heroProduct.image }} style={styles.heroImage} resizeMode="cover" />
-                ) : (
-                  <LinearGradient
-                    colors={theme.isDark ? (["#1B1B1D", "#2B2B31"] as const) : (["#F7F1EA", "#E8D8CB"] as const)}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.heroFallback}
-                  >
-                    <Ionicons name="image-outline" size={28} color={theme.colors.primary} />
-                  </LinearGradient>
-                )}
-              </View>
-              <View style={styles.heroCardBody}>
-                <Text style={[styles.heroCardEyebrow, { color: theme.colors.primary }]}>{t("home.heroProductEyebrow")}</Text>
-                <Text style={[styles.heroCardTitle, { color: theme.colors.text }]} numberOfLines={2}>
-                  {heroProduct?.title || t("home.heroFallbackTitle")}
-                </Text>
-                <Text style={[styles.heroCardMeta, { color: theme.colors.textMuted }]} numberOfLines={2}>
-                  {heroPrice}
-                </Text>
-              </View>
-            </Card>
+            {/* right — hero product card */}
+            <GlowPressable
+              onPress={() => hero ? nav.navigate("ProductDetails", { productId: hero.id }) : nav.navigate("Catalog")}
+              radius={radius.lg}
+              glowColor={theme.colors.primary}
+              style={styles.heroCardWrap}
+            >
+              <Card variant="solid" padded={false} style={[styles.heroCard, { backgroundColor: theme.colors.surface, borderColor: heroBorder }]}>
+                <View style={styles.heroImg}>
+                  {hero?.image ? (
+                    <Image source={{ uri: hero.image }} style={styles.heroImgFull} resizeMode="cover" />
+                  ) : (
+                    <LinearGradient
+                      colors={isDark ? (["#1A1A1C", "#28282E"] as const) : (["#FAF5EF", "#ECDCC9"] as const)}
+                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                      style={styles.heroImgPlaceholder}
+                    >
+                      <Ionicons name="image-outline" size={32} color={theme.colors.primary} />
+                    </LinearGradient>
+                  )}
+                  {/* label badge */}
+                  <View style={[styles.heroLabel, { backgroundColor: theme.colors.primary }]}>
+                    <Ionicons name="star" size={12} color="#FFF" />
+                    <Text style={styles.heroLabelText}>{t("home.heroProductLabel")}</Text>
+                  </View>
+                </View>
+                <View style={styles.heroCardBody}>
+                  <Text style={[styles.heroCardTitle, { color: theme.colors.text }]} numberOfLines={2}>
+                    {hero?.title || t("home.heroFallbackTitle")}
+                  </Text>
+                  <Text style={[styles.heroCardPrice, { color: theme.colors.primary }]} numberOfLines={1}>
+                    {heroPrice}
+                  </Text>
+                </View>
+              </Card>
+            </GlowPressable>
           </View>
         </LinearGradient>
 
-        {/* ── PROMO BANNERS ── */}
-        <PromoBanners placement="home" />
+        {/* ╔══════════════════════════════╗
+            ║  2 · STATS BAR               ║
+            ╚══════════════════════════════╝ */}
+        <Card variant="glass" style={[styles.statsBar, statsWrap && styles.statsBarWrap]}>
+          {STATS.map((s, i) => (
+            <View key={s.valueKey} style={[styles.statItem, i > 0 && !statsWrap && { borderLeftWidth: 1, borderLeftColor: statDivider, paddingLeft: spacing.lg }]}>
+              <View style={[styles.statIcon, { backgroundColor: theme.colors.primarySoft }]}>
+                <Ionicons name={s.icon} size={18} color={theme.colors.primary} />
+              </View>
+              <Text style={[styles.statValue, { color: theme.colors.primary }]}>{t(s.valueKey)}</Text>
+              <Text style={[styles.statLabel, { color: theme.colors.textMuted }]}>{t(s.labelKey)}</Text>
+            </View>
+          ))}
+        </Card>
 
-        {/* ── WHY CHOOSE US ── */}
-        <View style={styles.sectionBlock}>
-          <View style={styles.sectionHeaderCompact}>
-            <Text style={[styles.sectionEyebrow, { color: sectionEyebrowColor }]}>{t("home.featuresEyebrow")}</Text>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>{t("home.featuresTitle")}</Text>
+        {/* ╔══════════════════════════════╗
+            ║  3 · WHY CHOOSE US           ║
+            ╚══════════════════════════════╝ */}
+        <View style={styles.section}>
+          <View style={styles.sectionHead}>
+            <Text style={[styles.kicker, { color: sectionKicker }]}>{t("home.featuresKicker")}</Text>
+            <Text style={[styles.sectionH2, { color: theme.colors.text }]}>{t("home.featuresTitle")}</Text>
           </View>
 
-          <View style={styles.featuresGrid}>
-            {FEATURES.map((feat) => (
-              <View key={feat.titleKey} style={[styles.featureCardWrap, { width: featureCardWidth }]}>
-                <Card variant="glass" style={[styles.featureCard, { borderColor: heroBorder }]}>
-                  <View style={[styles.featureIconWrap, { backgroundColor: theme.colors.primarySoft }]}>
-                    <Ionicons name={feat.icon} size={22} color={theme.colors.primary} />
-                  </View>
-                  <Text style={[styles.featureTitle, { color: theme.colors.text }]}>{t(feat.titleKey)}</Text>
-                  <Text style={[styles.featureText, { color: theme.colors.textMuted }]}>{t(feat.textKey)}</Text>
+          <View style={styles.grid}>
+            {FEATURES.map((f) => (
+              <View key={f.titleKey} style={{ width: featureWidth }}>
+                <Card variant="glass" style={styles.featCard}>
+                  <LinearGradient
+                    colors={isDark
+                      ? (["rgba(249,115,22,0.14)", "rgba(249,115,22,0.04)"] as const)
+                      : (["rgba(234,88,12,0.08)", "rgba(234,88,12,0.02)"] as const)}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={styles.featIconBox}
+                  >
+                    <Ionicons name={f.icon} size={24} color={theme.colors.primary} />
+                  </LinearGradient>
+                  <Text style={[styles.featTitle, { color: theme.colors.text }]}>{t(f.titleKey)}</Text>
+                  <Text style={[styles.featText, { color: theme.colors.textMuted }]}>{t(f.textKey)}</Text>
                 </Card>
               </View>
             ))}
           </View>
         </View>
 
-        {/* ── FEATURED PRODUCTS ── */}
-        <View style={styles.sectionBlock}>
-          <View style={styles.sectionHeaderRow}>
-            <View style={styles.sectionHeaderCompact}>
-              <Text style={[styles.sectionEyebrow, { color: sectionEyebrowColor }]}>{t("home.productsEyebrow")}</Text>
-              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>{t("home.productsTitle")}</Text>
-              <Text style={[styles.sectionSubtitle, { color: theme.colors.textMuted }]}>{t("home.productsSubtitle")}</Text>
+        {/* ╔══════════════════════════════╗
+            ║  4 · PRODUCT SHOWCASE        ║
+            ╚══════════════════════════════╝ */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeadRow}>
+            <View style={styles.sectionHead}>
+              <Text style={[styles.kicker, { color: sectionKicker }]}>{t("home.productsKicker")}</Text>
+              <Text style={[styles.sectionH2, { color: theme.colors.text }]}>{t("home.productsTitle")}</Text>
+              <Text style={[styles.sectionP, { color: theme.colors.textMuted }]}>{t("home.productsSubtitle")}</Text>
             </View>
             <PrimaryButton
               tone="soft"
               title={t("home.productsAction")}
-              onPress={() => navigation.navigate("Catalog")}
-              buttonStyle={styles.headerButton}
+              onPress={() => nav.navigate("Catalog")}
+              buttonStyle={styles.sectionBtn}
               leftSlot={<Ionicons name="grid-outline" size={16} color={theme.colors.primary} />}
             />
           </View>
 
-          <View style={styles.previewGrid}>
-            {featuredProducts.length ? (
-              featuredProducts.map((item) => {
-                const image = item.image?.trim() || "";
-                const price = formatProductPrice(item, currency, t);
+          <View style={styles.grid}>
+            {featured.length ? featured.map((item) => {
+              const img = item.image?.trim() || "";
+              const price = fmtPrice(item, currency, t);
 
-                return (
-                  <View key={item.id} style={[styles.previewPressable, { width: productCardWidth }]}>
-                    <GlowPressable
-                      onPress={() => navigation.navigate("ProductDetails", { productId: item.id })}
-                      radius={radius.md}
-                      glowColor={theme.colors.primary}
-                    >
-                      <Card variant="solid" padded={false} style={[styles.productCard, { backgroundColor: theme.colors.surface }]}>
-                        <View style={styles.productMedia}>
-                          {image ? (
-                            <Image source={{ uri: image }} style={styles.productImage} resizeMode="cover" />
-                          ) : (
-                            <LinearGradient
-                              colors={theme.isDark ? (["#232325", "#303038"] as const) : (["#F4EEE8", "#E4D5C6"] as const)}
-                              start={{ x: 0, y: 0 }}
-                              end={{ x: 1, y: 1 }}
-                              style={styles.productFallback}
-                            >
-                              <Ionicons name="image-outline" size={22} color={theme.colors.primary} />
-                            </LinearGradient>
-                          )}
+              return (
+                <View key={item.id} style={{ width: productWidth }}>
+                  <GlowPressable
+                    onPress={() => nav.navigate("ProductDetails", { productId: item.id })}
+                    radius={radius.md}
+                    glowColor={theme.colors.primary}
+                  >
+                    <Card variant="solid" padded={false} style={[styles.prodCard, { backgroundColor: theme.colors.surface }]}>
+                      <View style={styles.prodImg}>
+                        {img ? (
+                          <Image source={{ uri: img }} style={styles.prodImgFull} resizeMode="cover" />
+                        ) : (
+                          <LinearGradient
+                            colors={isDark ? (["#1F1F21", "#2C2C32"] as const) : (["#F8F2EB", "#E8D8CB"] as const)}
+                            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                            style={styles.prodImgPlaceholder}
+                          >
+                            <Ionicons name="image-outline" size={24} color={theme.colors.primary} />
+                          </LinearGradient>
+                        )}
+                      </View>
+                      <View style={styles.prodBody}>
+                        <Text style={[styles.prodTitle, { color: theme.colors.text }]} numberOfLines={2}>{item.title}</Text>
+                        <Text style={[styles.prodDesc, { color: theme.colors.textMuted }]} numberOfLines={2}>
+                          {item.description || t("home.productsFallback")}
+                        </Text>
+                        <View style={styles.prodFooter}>
+                          <Text style={[styles.prodPrice, { color: theme.colors.primary }]} numberOfLines={1}>{price}</Text>
+                          <View style={[styles.prodArrow, { backgroundColor: theme.colors.primarySoft }]}>
+                            <Ionicons name="arrow-forward" size={14} color={theme.colors.primary} />
+                          </View>
                         </View>
-                        <View style={styles.productBody}>
-                          <Text style={[styles.productTitle, { color: theme.colors.text }]} numberOfLines={2}>
-                            {item.title}
-                          </Text>
-                          <Text style={[styles.productText, { color: theme.colors.textMuted }]} numberOfLines={2}>
-                            {item.description || t("home.productsFallback")}
-                          </Text>
-                          <Text style={[styles.productPrice, { color: theme.colors.primary }]} numberOfLines={1}>
-                            {price}
-                          </Text>
-                        </View>
-                      </Card>
-                    </GlowPressable>
-                  </View>
-                );
-              })
-            ) : (
-              <Card variant="solid" style={[styles.emptyCard, { backgroundColor: theme.colors.surface }]}>
+                      </View>
+                    </Card>
+                  </GlowPressable>
+                </View>
+              );
+            }) : (
+              <Card variant="solid" style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
+                <Ionicons name="cube-outline" size={28} color={theme.colors.primary} style={{ marginBottom: spacing.sm }} />
                 <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>{t("home.productsEmpty")}</Text>
                 <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>{t("home.productsEmptyHint")}</Text>
               </Card>
@@ -241,352 +305,327 @@ export function HomeScreen(): JSX.Element {
           </View>
         </View>
 
-        {/* ── OFFICIAL PARTNER ── */}
-        <OfficialPartnerBlock settings={settingsQuery.data} />
+        {/* ╔══════════════════════════════╗
+            ║  5 · PROMO BANNERS           ║
+            ╚══════════════════════════════╝ */}
+        <PromoBanners placement="home" />
 
-        {/* ── CTA ── */}
+        {/* ╔══════════════════════════════╗
+            ║  6 · OFFICIAL PARTNER        ║
+            ╚══════════════════════════════╝ */}
+        <OfficialPartnerBlock settings={settingsQ.data} />
+
+        {/* ╔══════════════════════════════╗
+            ║  7 · RICH CTA                ║
+            ╚══════════════════════════════╝ */}
         <LinearGradient
-          colors={theme.isDark ? (["#1B1B1D", "#2A1B12", "#4A250F"] as const) : (["#FFF7ED", "#F4E4D4", "#E0B98F"] as const)}
+          colors={isDark
+            ? (["#18171A", "#271B10", "#4F2810"] as const)
+            : (["#FFF8F0", "#F6E6D2", "#E8BF90"] as const)}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[styles.ctaShell, { borderColor: heroBorder }]}
         >
-          <Text style={[styles.sectionEyebrow, { color: heroText }]}>{t("home.ctaEyebrow")}</Text>
-          <Text style={[styles.ctaTitle, { color: heroText }]}>{t("home.ctaTitle")}</Text>
-          <Text style={[styles.ctaSubtitle, { color: heroSubtle }]}>{t("home.ctaSubtitle")}</Text>
+          <View pointerEvents="none" style={[styles.ctaBlob, { backgroundColor: glassAccent }]} />
 
-          <View style={styles.ctaActions}>
+          <Text style={[styles.kicker, { color: isDark ? "#FDBA74" : "#92400E" }]}>{t("home.ctaKicker")}</Text>
+          <Text style={[styles.ctaH2, { color: heroText }]}>{t("home.ctaTitle")}</Text>
+          <Text style={[styles.ctaP, { color: heroMuted }]}>{t("home.ctaSubtitle")}</Text>
+
+          <View style={styles.ctaCards}>
             <GlowPressable
-              onPress={() => navigation.navigate("Calculator")}
+              onPress={() => nav.navigate("Calculator")}
               radius={radius.md}
               glowColor={theme.colors.primary}
-              style={styles.ctaActionCard}
+              style={styles.ctaCardWrap}
             >
               <Card variant="solid" padded style={[styles.ctaCard, { backgroundColor: theme.colors.surface, borderColor: heroBorder }]}>
-                <View style={[styles.ctaIconWrap, { backgroundColor: theme.colors.primarySoft }]}>
-                  <Ionicons name="calculator-outline" size={24} color={theme.colors.primary} />
+                <View style={[styles.ctaIconBox, { backgroundColor: theme.colors.primarySoft }]}>
+                  <Ionicons name="calculator-outline" size={26} color={theme.colors.primary} />
                 </View>
-                <Text style={[styles.ctaCardTitle, { color: theme.colors.text }]}>{t("home.openCalculator")}</Text>
-                <Ionicons name="arrow-forward" size={16} color={theme.colors.primary} style={styles.ctaArrow} />
+                <View style={styles.ctaCardText}>
+                  <Text style={[styles.ctaCardH3, { color: theme.colors.text }]}>{t("home.ctaCalcTitle")}</Text>
+                  <Text style={[styles.ctaCardP, { color: theme.colors.textMuted }]}>{t("home.ctaCalcText")}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={theme.colors.primary} />
               </Card>
             </GlowPressable>
 
             <GlowPressable
-              onPress={() => navigation.navigate("Catalog")}
+              onPress={() => nav.navigate("Catalog")}
               radius={radius.md}
               glowColor={theme.colors.primary}
-              style={styles.ctaActionCard}
+              style={styles.ctaCardWrap}
             >
               <Card variant="solid" padded style={[styles.ctaCard, { backgroundColor: theme.colors.surface, borderColor: heroBorder }]}>
-                <View style={[styles.ctaIconWrap, { backgroundColor: theme.colors.primarySoft }]}>
-                  <Ionicons name="grid-outline" size={24} color={theme.colors.primary} />
+                <View style={[styles.ctaIconBox, { backgroundColor: theme.colors.primarySoft }]}>
+                  <Ionicons name="grid-outline" size={26} color={theme.colors.primary} />
                 </View>
-                <Text style={[styles.ctaCardTitle, { color: theme.colors.text }]}>{t("home.browseCatalog")}</Text>
-                <Ionicons name="arrow-forward" size={16} color={theme.colors.primary} style={styles.ctaArrow} />
+                <View style={styles.ctaCardText}>
+                  <Text style={[styles.ctaCardH3, { color: theme.colors.text }]}>{t("home.ctaCatalogTitle")}</Text>
+                  <Text style={[styles.ctaCardP, { color: theme.colors.textMuted }]}>{t("home.ctaCatalogText")}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={theme.colors.primary} />
               </Card>
             </GlowPressable>
           </View>
         </LinearGradient>
 
+        {/* footer */}
         <SiteFooter gutter={gutter} />
       </AppScrollView>
     </ScreenContainer>
   );
 }
 
-const styles = StyleSheet.create({
-  page: {
-    gap: spacing.xl,
-  },
+/* ═══════════════════════════════════════════════
+   STYLES
+   ═══════════════════════════════════════════════ */
 
-  /* ── Hero ── */
+const styles = StyleSheet.create({
+  page: { gap: spacing.xl + 8 },
+
+  /* ── hero ── */
   heroShell: {
     borderRadius: radius.lg,
     borderWidth: 1,
-    padding: spacing.lg,
+    padding: spacing.lg + 4,
     overflow: "hidden",
     position: "relative",
   },
-  heroDecorCircle: {
+  blob1: {
     position: "absolute",
-    top: -60,
-    right: -60,
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    opacity: 0.6,
+    top: -80,
+    right: -50,
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    opacity: 0.7,
   },
-  heroGrid: {
-    gap: spacing.lg,
+  blob2: {
+    position: "absolute",
+    bottom: -60,
+    left: -40,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    opacity: 0.5,
   },
-  heroGridSplit: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  heroCopy: {
-    flex: 1,
-    gap: spacing.md,
-  },
+  heroInner: { gap: spacing.lg + 4 },
+  heroSplit: { flexDirection: "row", alignItems: "center" },
+  heroCopy: { flex: 1, gap: spacing.md, zIndex: 2 },
   kickerPill: {
     alignSelf: "flex-start",
-    minHeight: 34,
-    paddingHorizontal: 12,
+    height: 34,
+    paddingHorizontal: 14,
     borderRadius: 999,
     borderWidth: 1,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
-  kickerText: {
+  kickerLabel: {
     ...font(800),
-    fontSize: 12,
-    letterSpacing: 0.36,
+    fontSize: 11,
+    letterSpacing: 0.5,
     textTransform: "uppercase",
   },
-  heroTitle: {
+  heroH1: {
     ...font(900),
-    fontSize: 40,
-    lineHeight: 46,
-    letterSpacing: -0.9,
-    maxWidth: 620,
+    fontSize: 44,
+    lineHeight: 50,
+    letterSpacing: -1.1,
+    maxWidth: 580,
   },
-  heroSubtitle: {
+  heroP: {
     fontSize: 16,
-    lineHeight: 24,
-    maxWidth: 560,
+    lineHeight: 25,
+    maxWidth: 520,
+    ...font(400),
   },
-  heroActions: {
+  heroBtns: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing.sm,
     paddingTop: spacing.sm,
   },
-  primaryAction: {
-    minWidth: 220,
-    minHeight: 52,
-  },
-  secondaryAction: {
-    minWidth: 188,
-    minHeight: 52,
-  },
-  heroCard: {
-    flex: 1,
-    overflow: "hidden",
-  },
-  heroMedia: {
-    height: 300,
+  heroBtn: { minWidth: 210, minHeight: 52 },
+  heroBtn2: { minWidth: 170, minHeight: 52 },
+
+  /* hero product card */
+  heroCardWrap: { flex: 1, minWidth: 260, maxWidth: 400 },
+  heroCard: { overflow: "hidden" },
+  heroImg: {
+    height: 280,
     overflow: "hidden",
     borderTopLeftRadius: radius.md,
     borderTopRightRadius: radius.md,
+    position: "relative",
   },
-  heroImage: {
-    width: "100%",
-    height: "100%",
-  },
-  heroFallback: {
-    flex: 1,
+  heroImgFull: { width: "100%", height: "100%" },
+  heroImgPlaceholder: { flex: 1, alignItems: "center", justifyContent: "center" },
+  heroLabel: {
+    position: "absolute",
+    top: spacing.sm,
+    left: spacing.sm,
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    height: 28,
+    borderRadius: 999,
   },
-  heroCardBody: {
-    padding: spacing.md,
-    gap: spacing.xs,
-  },
-  heroCardEyebrow: {
-    ...font(800),
-    fontSize: 12,
-    letterSpacing: 0.28,
-    textTransform: "uppercase",
-  },
-  heroCardTitle: {
-    ...font(900),
-    fontSize: 24,
-    lineHeight: 30,
-  },
-  heroCardMeta: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
+  heroLabelText: { ...font(800), fontSize: 11, color: "#FFF", letterSpacing: 0.2 },
+  heroCardBody: { padding: spacing.md, gap: spacing.xs },
+  heroCardTitle: { ...font(900), fontSize: 20, lineHeight: 26 },
+  heroCardPrice: { ...font(800), fontSize: 15 },
 
-  /* ── Section layout ── */
-  sectionBlock: {
+  /* ── stats bar ── */
+  statsBar: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.md,
     gap: spacing.lg,
   },
-  sectionHeaderRow: {
+  statsBarWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+  },
+  statItem: {
+    alignItems: "center",
+    gap: 6,
+    minWidth: 100,
+    paddingVertical: spacing.xs,
+  },
+  statIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 2,
+  },
+  statValue: { ...font(900), fontSize: 26, lineHeight: 30, letterSpacing: -0.4 },
+  statLabel: { ...font(500), fontSize: 12, lineHeight: 16, textAlign: "center" },
+
+  /* ── sections ── */
+  section: { gap: spacing.lg },
+  sectionHeadRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-    gap: spacing.md,
     alignItems: "flex-end",
+    gap: spacing.md,
   },
-  sectionHeaderCompact: {
-    flex: 1,
-    minWidth: 260,
-    gap: spacing.sm,
-  },
-  sectionEyebrow: {
+  sectionHead: { flex: 1, minWidth: 240, gap: spacing.sm },
+  kicker: {
     ...font(800),
     fontSize: 12,
-    letterSpacing: 0.34,
+    letterSpacing: 0.4,
     textTransform: "uppercase",
   },
-  sectionTitle: {
+  sectionH2: {
     ...font(900),
     fontSize: 30,
     lineHeight: 36,
     letterSpacing: -0.6,
-    maxWidth: 680,
+    maxWidth: 640,
   },
-  sectionSubtitle: {
-    fontSize: 15,
-    lineHeight: 22,
-    maxWidth: 620,
-  },
-  headerButton: {
-    minHeight: 44,
-  },
+  sectionP: { fontSize: 15, lineHeight: 22, maxWidth: 560 },
+  sectionBtn: { minHeight: 44 },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
 
-  /* ── Feature highlights ── */
-  featuresGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.md,
-  },
-  featureCardWrap: {
-    minWidth: 0,
-  },
-  featureCard: {
-    gap: spacing.sm,
-  },
-  featureIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: spacing.xs,
-  },
-  featureTitle: {
-    ...font(800),
-    fontSize: 16,
-    lineHeight: 20,
-  },
-  featureText: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-
-  /* ── Product preview grid ── */
-  previewGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.md,
-  },
-  previewPressable: {
-    minWidth: 0,
-  },
-  productCard: {
-    overflow: "hidden",
-  },
-  productMedia: {
-    height: 220,
-    overflow: "hidden",
-    borderTopLeftRadius: radius.md,
-    borderTopRightRadius: radius.md,
-  },
-  productImage: {
-    width: "100%",
-    height: "100%",
-  },
-  productFallback: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  productBody: {
-    padding: spacing.md,
-    gap: spacing.sm,
-  },
-  productTitle: {
-    ...font(900),
-    fontSize: 18,
-    lineHeight: 22,
-  },
-  productText: {
-    fontSize: 14,
-    lineHeight: 20,
-    minHeight: 40,
-  },
-  productPrice: {
-    ...font(800),
-    fontSize: 14,
-    marginTop: spacing.xs,
-  },
-  emptyCard: {
-    width: "100%",
-    gap: spacing.sm,
-  },
-  emptyTitle: {
-    ...font(800),
-    fontSize: 17,
-  },
-  emptyText: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-
-  /* ── CTA ── */
-  ctaShell: {
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    padding: spacing.lg,
-    gap: spacing.sm,
-    overflow: "hidden",
-  },
-  ctaTitle: {
-    ...font(900),
-    fontSize: 30,
-    lineHeight: 36,
-    letterSpacing: -0.6,
-    maxWidth: 620,
-  },
-  ctaSubtitle: {
-    fontSize: 15,
-    lineHeight: 22,
-    maxWidth: 560,
-  },
-  ctaActions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.md,
-    marginTop: spacing.md,
-  },
-  ctaActionCard: {
-    flex: 1,
-    minWidth: 200,
-  },
-  ctaCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-  },
-  ctaIconWrap: {
+  /* ── feature cards ── */
+  featCard: { gap: spacing.sm, minHeight: 170 },
+  featIconBox: {
     width: 48,
     height: 48,
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
+    marginBottom: 2,
   },
-  ctaCardTitle: {
-    ...font(800),
-    fontSize: 16,
-    flex: 1,
+  featTitle: { ...font(800), fontSize: 16, lineHeight: 20 },
+  featText: { fontSize: 14, lineHeight: 21 },
+
+  /* ── product cards ── */
+  prodCard: { overflow: "hidden" },
+  prodImg: {
+    height: 210,
+    overflow: "hidden",
+    borderTopLeftRadius: radius.md,
+    borderTopRightRadius: radius.md,
   },
-  ctaArrow: {
-    marginLeft: "auto" as any,
+  prodImgFull: { width: "100%", height: "100%" },
+  prodImgPlaceholder: { flex: 1, alignItems: "center", justifyContent: "center" },
+  prodBody: { padding: spacing.md, gap: spacing.sm },
+  prodTitle: { ...font(900), fontSize: 18, lineHeight: 22 },
+  prodDesc: { fontSize: 14, lineHeight: 20, minHeight: 40 },
+  prodFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: spacing.xs },
+  prodPrice: { ...font(800), fontSize: 15 },
+  prodArrow: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
-  pressed: {
-    opacity: 0.94,
+  /* empty state */
+  emptyState: { width: "100%", alignItems: "center", paddingVertical: spacing.xl },
+  emptyTitle: { ...font(800), fontSize: 17 },
+  emptyText: { fontSize: 14, lineHeight: 20, textAlign: "center", maxWidth: 340 },
+
+  /* ── CTA ── */
+  ctaShell: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    padding: spacing.lg + 4,
+    gap: spacing.sm,
+    overflow: "hidden",
+    position: "relative",
   },
+  ctaBlob: {
+    position: "absolute",
+    bottom: -40,
+    right: -30,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    opacity: 0.6,
+  },
+  ctaH2: {
+    ...font(900),
+    fontSize: 28,
+    lineHeight: 34,
+    letterSpacing: -0.5,
+    maxWidth: 580,
+  },
+  ctaP: { fontSize: 15, lineHeight: 22, maxWidth: 520 },
+  ctaCards: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.md,
+    marginTop: spacing.md,
+    zIndex: 2,
+  },
+  ctaCardWrap: { flex: 1, minWidth: 240 },
+  ctaCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+  },
+  ctaIconBox: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  ctaCardText: { flex: 1, gap: 3 },
+  ctaCardH3: { ...font(800), fontSize: 16 },
+  ctaCardP: { fontSize: 13, lineHeight: 18 },
 });
