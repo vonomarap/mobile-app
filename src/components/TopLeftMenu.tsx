@@ -193,7 +193,7 @@ export function TopLeftMenu(): JSX.Element {
 
   const cartPanelTranslateX = cartProgress.interpolate({
     inputRange: [0, 1],
-    outputRange: [22, 0]
+    outputRange: [-22, 0]
   });
 
   const desktopNavEnabled = Platform.OS === "web" && width >= theme.layout.desktopNavMinWidth;
@@ -352,11 +352,6 @@ export function TopLeftMenu(): JSX.Element {
   };
 
   const openCart = () => {
-    if (Platform.OS === "web") {
-      openCartPage();
-      return;
-    }
-
     if (desktopNavEnabled) {
       closeMenuImmediate();
       if (cartOpen) closeCartPanel();
@@ -669,7 +664,7 @@ export function TopLeftMenu(): JSX.Element {
             <Animated.View
               style={[
                 styles.cartDrawerWrap,
-                { top: langMenuTop, right: desktopMenuRight, bottom: spacing.md, width: cartDrawerWidth },
+                { top: langMenuTop, left: desktopMenuRight, bottom: spacing.md, width: cartDrawerWidth },
                 {
                   opacity: cartPanelOpacity,
                   transform: [{ translateX: cartPanelTranslateX }]
