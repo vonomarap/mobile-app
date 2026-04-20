@@ -37,7 +37,7 @@ function ModernSwitch({
 
   const dx = progress.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, 24]
+    outputRange: [0, 20]
   });
 
   return (
@@ -98,13 +98,13 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
       gap: spacing.xs
     },
     row: {
-      minHeight: 56,
+      minHeight: 54,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      borderRadius: radius.md,
+      borderRadius: radius.sm,
       paddingHorizontal: spacing.sm,
       paddingVertical: 10,
-      backgroundColor: theme.colors.surface2,
+      backgroundColor: theme.colors.surface,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
@@ -137,18 +137,18 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
       color: theme.colors.textMuted
     },
     switchTrack: {
-      width: 58,
-      height: 34,
+      width: 46,
+      height: 26,
       borderRadius: 999,
       borderWidth: 1,
       alignItems: "flex-start",
       justifyContent: "center",
-      padding: 3,
+      padding: 2,
       ...( { outlineStyle: "none", outlineWidth: 0, WebkitTapHighlightColor: "transparent" } as object ),
       ...( { cursor: "pointer" } as object )
     },
     switchTrackOff: {
-      backgroundColor: theme.colors.surface,
+      backgroundColor: theme.colors.surface2,
       borderColor: theme.colors.border
     },
     switchTrackOn: {
@@ -156,8 +156,8 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
       borderColor: theme.colors.primary
     },
     switchThumb: {
-      width: 28,
-      height: 28,
+      width: 20,
+      height: 20,
       borderRadius: 999,
       backgroundColor: "#FFFFFF",
       borderWidth: 1,
@@ -165,7 +165,7 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
       ...(theme.shadow.sm as object)
     },
     switchPressed: {
-      opacity: 0.92
+      opacity: 0.96
     },
     switchDisabled: {
       opacity: 0.6

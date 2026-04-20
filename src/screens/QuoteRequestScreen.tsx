@@ -2,19 +2,22 @@ import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Alert, Platform, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { AppScrollView } from "../components/AppScrollView";
 import { Card } from "../components/Card";
 import { DatePickerModal } from "../components/DatePickerModal";
 import { PickerField } from "../components/PickerField";
+import { PriceBreakdownList } from "../components/PriceBreakdownList";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { QuoteSuccessModal } from "../components/QuoteSuccessModal";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { ScreenHeader } from "../components/ScreenHeader";
+import { SelectListModal, type SelectListOption } from "../components/SelectListModal";
 import { SiteFooter } from "../components/SiteFooter";
 import { TextField } from "../components/TextField";
+import { KANEVSKY_MUNICIPALITY_ID, kanevskyPlaces, krasnodarMunicipalities } from "../constants/krasnodarLocations";
 import { RootStackParamList } from "../navigation/types";
 import { createQuote } from "../services/quotes";
 import { auth } from "../services/firebase";
@@ -22,7 +25,12 @@ import { useCart } from "../services/cart-context";
 import { ICON_SIZE, calculatorSectionIcon } from "../theme/iconography";
 import { spacing } from "../theme/tokens";
 import { useTheme } from "../theme/ThemeProvider";
+import { buildQuoteBreakdown } from "../utils/calc-breakdown";
 import { formatMoney } from "../utils/money";
+import { formatOrderItemLabel } from "../utils/order-items";
+
+type LocationPickerKey = "municipality" | "kanevskyPlace";
+type PickerRect = { x: number; y: number; width: number; height: number };
 
 export function QuoteRequestScreen(): JSX.Element {
   const { t, i18n } = useTranslation();
@@ -30,18 +38,23 @@ export function QuoteRequestScreen(): JSX.Element {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, "QuoteRequest">>();
   const queryClient = useQueryClient();
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const isDesktopWeb = Platform.OS === "web" && screenWidth >= theme.layout.desktopNavMinWidth;
   const desktopContent = isDesktopWeb ? styles.desktopContent : null;
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
+  const [selectedMunicipalityId, setSelectedMunicipalityId] = useState<string | null>(null);
+  const [selectedKanevskyPlaceId, setSelectedKanevskyPlaceId] = useState<string | null>(null);
   const [preferredDate, setPreferredDate] = useState<string | null>(null);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [locationPickerOpen, setLocationPickerOpen] = useState<LocationPickerKey | null>(null);
+  const [locationPickerRect, setLocationPickerRect] = useState<PickerRect | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [successQuoteId, setSuccessQuoteId] = useState<string | null>(null);
+  const municipalityAnchorRef = useRef<View | null>(null);
+  const kanevskyPlaceAnchorRef = useRef<View | null>(null);
 
   const quoteMutation = useMutation({ mutationFn: createQuote });
   const { clear } = useCart();
@@ -62,6 +75,91 @@ export function QuoteRequestScreen(): JSX.Element {
   const currency = params?.currency;
   const promoCode = params?.promoCode ?? null;
 
+  const municipalityOptions = useMemo<SelectListOption<string>[]>(
+    () => [...krasnodarMunicipalities]
+      .sort((a, b) => {
+        if (a.id === KANEVSKY_MUNICIPALITY_ID) return -1;
+        if (b.id === KANEVSKY_MUNICIPALITY_ID) return 1;
+        return a.label.localeCompare(b.label, "ru");
+      })
+      .map((item) => ({ value: item.id, label: item.label })),
+    []
+  );
+  const kanevskyPlaceOptions = useMemo<SelectListOption<string>[]>(
+    () => kanevskyPlaces.map((item) => ({ value: item.id, label: item.name })),
+    []
+  );
+  const selectedMunicipality = useMemo(
+    () => krasnodarMunicipalities.find((item) => item.id === selectedMunicipalityId) ?? null,
+    [selectedMunicipalityId]
+  );
+  const isKanevskyDistrict = selectedMunicipalityId === KANEVSKY_MUNICIPALITY_ID;
+  const selectedKanevskyPlace = useMemo(
+    () => kanevskyPlaces.find((item) => item.id === selectedKanevskyPlaceId) ?? null,
+    [selectedKanevskyPlaceId]
+  );
+  const composedAddress = useMemo(
+    () => (
+      [
+        selectedMunicipality?.label,
+        isKanevskyDistrict ? selectedKanevskyPlace?.name : undefined,
+      ]
+        .filter(Boolean)
+        .join(", ")
+    ),
+    [isKanevskyDistrict, selectedKanevskyPlace?.name, selectedMunicipality?.label]
+  );
+  const openLocationPicker = (key: LocationPickerKey) => {
+    const ref = key === "municipality" ? municipalityAnchorRef : kanevskyPlaceAnchorRef;
+    const fallbackWidth = Math.max(260, Math.min(520, screenWidth - spacing.md * 2));
+    const fallbackRect = {
+      x: spacing.md,
+      y: Math.max(spacing.md, Math.round(screenHeight * 0.22)),
+      width: fallbackWidth,
+      height: 50,
+    };
+
+    const anchor = ref.current;
+    if (!anchor) {
+      setLocationPickerRect(fallbackRect);
+      setLocationPickerOpen(key);
+      return;
+    }
+
+    anchor.measureInWindow((x, y, width, height) => {
+      setLocationPickerRect({
+        x: Number.isFinite(x) ? x : fallbackRect.x,
+        y: Number.isFinite(y) ? y : fallbackRect.y,
+        width: Number.isFinite(width) && width > 0 ? width : fallbackRect.width,
+        height: Number.isFinite(height) && height > 0 ? height : fallbackRect.height,
+      });
+      setLocationPickerOpen(key);
+    });
+  };
+  const locationPickerOptions = locationPickerOpen === "kanevskyPlace" ? kanevskyPlaceOptions : municipalityOptions;
+  const locationPickerValue = locationPickerOpen === "kanevskyPlace" ? selectedKanevskyPlaceId : selectedMunicipalityId;
+  const locationAnchorX = locationPickerRect?.x ?? spacing.md;
+  const locationAnchorY = locationPickerRect?.y ?? spacing.md;
+  const locationAnchorWidth = locationPickerRect?.width ?? Math.max(260, screenWidth - spacing.md * 2);
+  const locationAnchorHeight = locationPickerRect?.height ?? 50;
+  const locationMenuHorizontalMargin = spacing.sm;
+  const locationMenuWidth = Math.min(
+    Math.max(locationAnchorWidth, 260),
+    Math.max(260, screenWidth - locationMenuHorizontalMargin * 2)
+  );
+  const locationMenuLeft = Math.min(
+    Math.max(locationMenuHorizontalMargin, locationAnchorX),
+    Math.max(locationMenuHorizontalMargin, screenWidth - locationMenuWidth - locationMenuHorizontalMargin)
+  );
+  const locationMenuBelowTop = Math.max(spacing.sm, locationAnchorY + locationAnchorHeight + spacing.xs);
+  const locationSpaceBelow = Math.max(0, screenHeight - locationMenuBelowTop - spacing.sm);
+  const locationSpaceAbove = Math.max(0, locationAnchorY - spacing.sm);
+  const locationOpenAbove = locationSpaceBelow < 180 && locationSpaceAbove > locationSpaceBelow;
+  const locationMenuMaxHeight = Math.max(140, Math.min(360, locationOpenAbove ? locationSpaceAbove : locationSpaceBelow));
+  const locationMenuTop = locationOpenAbove
+    ? Math.max(spacing.sm, locationAnchorY - locationMenuMaxHeight - spacing.xs)
+    : locationMenuBelowTop;
+
   const orderSubtotal = useMemo(
     () => orderItems.reduce((sum, item) => sum + (Number(item.preview?.total) || 0), 0),
     [orderItems]
@@ -69,17 +167,10 @@ export function QuoteRequestScreen(): JSX.Element {
   const previewTotal = typeof params?.previewTotal === "number" && Number.isFinite(params.previewTotal)
     ? params.previewTotal
     : orderSubtotal;
-
-  const renderItemLabel = (index: number): string => {
-    const item = orderItems[index];
-    const input = item?.calcInput;
-    const kind = input?.productType === "door" ? t("calculator.types.door") : t("calculator.types.window");
-    const widthCm = typeof input?.width === "number" && Number.isFinite(input.width) ? Math.round(input.width * 100) : null;
-    const heightCm = typeof input?.height === "number" && Number.isFinite(input.height) ? Math.round(input.height * 100) : null;
-    const qty = typeof input?.quantity === "number" && Number.isFinite(input.quantity) ? Math.max(1, Math.round(input.quantity)) : 1;
-    const sizeLabel = widthCm && heightCm ? `${widthCm}x${heightCm} cm` : "-";
-    return `${kind} · ${sizeLabel} · x${qty}`;
-  };
+  const breakdown = useMemo(
+    () => buildQuoteBreakdown(orderItems.map((item) => item.preview?.calcDto), Math.max(0, orderSubtotal - previewTotal)),
+    [orderItems, orderSubtotal, previewTotal]
+  );
 
   const onSubmit = async () => {
     if (!orderItems.length || !currency) return;
@@ -96,12 +187,22 @@ export function QuoteRequestScreen(): JSX.Element {
 
     try {
       const response = await quoteMutation.mutateAsync({
-        items: orderItems.map((item) => ({ calcInput: item.calcInput })),
+        items: orderItems.map((item) => (
+          item.kind === "moskitki"
+            ? {
+                kind: "moskitki" as const,
+                moskitki: item.moskitki,
+              }
+            : {
+                kind: "calc" as const,
+                calcInput: item.calcInput,
+              }
+        )),
         contact: {
           name: trimmedName,
           phone: trimmedPhone
         },
-        address: address.trim(),
+        address: composedAddress,
         preferredMeasurementDate: preferredDate || null,
         currency,
         promoCode
@@ -145,7 +246,7 @@ export function QuoteRequestScreen(): JSX.Element {
           </View>
 
           <View style={desktopContent}>
-            <Card style={styles.card}>
+            <Card variant="solid" style={styles.card}>
               <View style={styles.cardTitleRow}>
                 <View style={[styles.cardTitleIcon, { backgroundColor: theme.colors.primarySoft }]}> 
                   <Ionicons name="cart-outline" size={ICON_SIZE.md} color={theme.colors.primary} />
@@ -167,7 +268,7 @@ export function QuoteRequestScreen(): JSX.Element {
                   >
                     <View style={styles.orderItemMain}>
                       <Text style={[styles.orderItemTitle, { color: theme.colors.text }]} numberOfLines={2}>
-                        {index + 1}. {renderItemLabel(index)}
+                        {index + 1}. {formatOrderItemLabel(item, t)}
                       </Text>
                       <Text style={[styles.orderItemPrice, { color: theme.colors.primary }]}>
                         {formatMoney(Number(item.preview?.total) || 0, currency)}
@@ -197,17 +298,19 @@ export function QuoteRequestScreen(): JSX.Element {
 
               <View style={styles.totalWrap}>
                 <Text style={[styles.totalLabel, { color: theme.colors.textMuted }]}> 
-                  {t("quotes.details.fields.total", { defaultValue: "Итого" })}
+                  {t("calculator.totalLabel")}
                 </Text>
                 <Text style={[styles.totalValue, { color: theme.colors.primary }]}> 
                   {formatMoney(previewTotal, currency)}
                 </Text>
               </View>
+              <PriceBreakdownList breakdown={breakdown} currency={currency} style={styles.breakdownList} />
+              <Text style={[styles.disclaimer, { color: theme.colors.textMuted }]}>{t("calculator.disclaimer")}</Text>
             </Card>
           </View>
 
           <View style={desktopContent}>
-            <Card style={styles.card}>
+            <Card variant="solid" style={styles.card}>
               <View style={styles.cardTitleRow}>
                 <View style={[styles.cardTitleIcon, { backgroundColor: theme.colors.primarySoft }]}> 
                   <Ionicons name={calculatorSectionIcon.contact} size={ICON_SIZE.md} color={theme.colors.primary} />
@@ -242,22 +345,42 @@ export function QuoteRequestScreen(): JSX.Element {
           </View>
 
           <View style={desktopContent}>
-            <Card style={styles.card}>
+            <Card variant="solid" style={styles.card}>
               <View style={styles.cardTitleRow}>
                 <View style={[styles.cardTitleIcon, { backgroundColor: theme.colors.primarySoft }]}> 
                   <Ionicons name={calculatorSectionIcon.address} size={ICON_SIZE.md} color={theme.colors.primary} />
                 </View>
                 <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>{t("calculator.sectionAddress")}</Text>
               </View>
-              <TextField
-                label={t("calculator.address")}
-                leftSlot={<Ionicons name="location-outline" size={ICON_SIZE.md} color={theme.colors.primary} />}
-                value={address}
-                onChangeText={setAddress}
-                placeholder={t("calculator.addressPlaceholder")}
-              />
+              <View ref={municipalityAnchorRef} collapsable={false}>
+                <PickerField
+                  label={t("calculator.municipality")}
+                  active={locationPickerOpen === "municipality"}
+                  variant="select"
+                  leftSlot={<Ionicons name="map-outline" size={ICON_SIZE.md} color={theme.colors.primary} />}
+                  rightSlot={<Ionicons name="chevron-down" size={18} color={theme.colors.textMuted} />}
+                  value={selectedMunicipality?.label ?? ""}
+                  placeholder={t("calculator.municipalityPlaceholder")}
+                  onPress={() => openLocationPicker("municipality")}
+                />
+              </View>
+              {isKanevskyDistrict ? (
+                <View ref={kanevskyPlaceAnchorRef} collapsable={false}>
+                  <PickerField
+                    label={t("calculator.kanevskyPlace")}
+                    active={locationPickerOpen === "kanevskyPlace"}
+                    variant="select"
+                    leftSlot={<Ionicons name="navigate-outline" size={ICON_SIZE.md} color={theme.colors.primary} />}
+                    rightSlot={<Ionicons name="chevron-down" size={18} color={theme.colors.textMuted} />}
+                    value={selectedKanevskyPlace?.name ?? ""}
+                    placeholder={t("calculator.kanevskyPlacePlaceholder")}
+                    onPress={() => openLocationPicker("kanevskyPlace")}
+                  />
+                </View>
+              ) : null}
               <PickerField
                 label={t("calculator.preferredDate")}
+                active={datePickerOpen}
                 leftSlot={<Ionicons name="calendar-outline" size={ICON_SIZE.md} color={theme.colors.primary} />}
                 rightSlot={<Ionicons name="chevron-down" size={18} color={theme.colors.textMuted} />}
                 value={formatPreferredDate(preferredDate)}
@@ -299,6 +422,30 @@ export function QuoteRequestScreen(): JSX.Element {
             setDatePickerOpen(false);
           }}
           onClose={() => setDatePickerOpen(false)}
+        />
+
+        <SelectListModal
+          mounted={locationPickerOpen !== null}
+          open={locationPickerOpen !== null}
+          onClose={() => setLocationPickerOpen(null)}
+          options={locationPickerOptions}
+          value={locationPickerValue}
+          onSelect={(next) => {
+            if (locationPickerOpen === "kanevskyPlace") {
+              setSelectedKanevskyPlaceId(next);
+            } else {
+              setSelectedMunicipalityId(next);
+              if (next !== KANEVSKY_MUNICIPALITY_ID) {
+                setSelectedKanevskyPlaceId(null);
+              }
+            }
+            setLocationPickerOpen(null);
+          }}
+          top={locationMenuTop}
+          left={locationMenuLeft}
+          width={locationMenuWidth}
+          maxHeight={locationMenuMaxHeight}
+          showVerticalScrollIndicator={locationPickerOptions.length > 8}
         />
 
         <QuoteSuccessModal
@@ -395,6 +542,13 @@ const styles = StyleSheet.create({
   totalValue: {
     fontSize: 13,
     fontWeight: "800"
+  },
+  breakdownList: {
+    marginTop: spacing.xs,
+  },
+  disclaimer: {
+    fontSize: 12,
+    lineHeight: 18,
   },
   center: {
     flex: 1,

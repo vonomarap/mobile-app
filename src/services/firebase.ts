@@ -1,5 +1,6 @@
 import { getApps, initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
+import { getFunctions } from "firebase/functions";
 import { initializeFirestore } from "firebase/firestore";
 
 const fallbackFirebaseConfig = {
@@ -23,6 +24,7 @@ const firebaseConfig = {
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
+export const functions = getFunctions(app);
 // Optional fields are common in our calculator payloads; ignoreUndefinedProperties prevents writes from failing
 // when some nested keys are intentionally omitted.
 export const db = initializeFirestore(app, { ignoreUndefinedProperties: true });

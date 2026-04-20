@@ -7,14 +7,16 @@ import { CalculatorScreen } from "../screens/CalculatorScreen";
 import { CartScreen } from "../screens/CartScreen";
 import { CatalogScreen } from "../screens/CatalogScreen";
 import { ContactsScreen } from "../screens/ContactsScreen";
+import { FaqScreen } from "../screens/FaqScreen";
 import { GalleryScreen } from "../screens/GalleryScreen";
 import { HomeScreen } from "../screens/HomeScreen";
+import { MoskitkiScreen } from "../screens/MoskitkiScreen";
 import { ProductDetailsScreen } from "../screens/ProductDetailsScreen";
 import { QuoteDetailsScreen } from "../screens/QuoteDetailsScreen";
 import { QuoteRequestScreen } from "../screens/QuoteRequestScreen";
 import { QuotesScreen } from "../screens/QuotesScreen";
 import { SupportChatScreen } from "../screens/SupportChatScreen";
-import { RootStackParamList } from "./types";
+import { HELP_SECTION_KEYS, type HelpSectionKey, RootStackParamList } from "./types";
 import { useTheme } from "../theme/ThemeProvider";
 import { SupportChatFab } from "../components/SupportChatFab";
 import { TopLeftMenu } from "../components/TopLeftMenu";
@@ -60,6 +62,14 @@ export function AppNavigator({
       config: {
         screens: {
           Home: "",
+          Faq: {
+            path: "faq/:section?",
+            parse: {
+              section: (value: string) =>
+                HELP_SECTION_KEYS.includes(value as HelpSectionKey) ? (value as HelpSectionKey) : undefined
+            }
+          },
+          Moskitki: "moskitki",
           Catalog: "catalog",
           Gallery: "gallery",
           Calculator: {
@@ -99,6 +109,8 @@ export function AppNavigator({
         }}
       >
         <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="Faq" component={FaqScreen} />
+        <Stack.Screen name="Moskitki" component={MoskitkiScreen} />
         <Stack.Screen name="Catalog" component={CatalogScreen} />
         <Stack.Screen name="Gallery" component={GalleryScreen} />
         <Stack.Screen name="Calculator" component={CalculatorScreen} />

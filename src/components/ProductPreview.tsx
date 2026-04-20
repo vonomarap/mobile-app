@@ -3,6 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useMemo, useState } from "react";
 import { LayoutChangeEvent, Platform, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
+import type { GlassOptionsInput } from "../utils/calc";
 import { font } from "../theme/font";
 import { radius, spacing } from "../theme/tokens";
 import { useTheme } from "../theme/ThemeProvider";
@@ -56,9 +57,9 @@ export function ProductPreview({
   lamination?: "none" | "oneSide" | "twoSide";
   laminationGroup?: "white" | "wood" | "color";
   laminationColor?: "gold_oak" | "grey_oak" | "dark_oak" | "other" | null;
-  glassOptions?: { energySaving?: boolean; multiFunctional?: boolean };
+  glassOptions?: GlassOptionsInput;
   decorBars?: boolean;
-  decorBarsColor?: "white" | "gold";
+  decorBarsColor?: "white" | "gold" | "brown";
 }): JSX.Element {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -213,7 +214,7 @@ export function ProductPreview({
   const showHinges = detailLevel === "high";
   const showDrainSlots = detailLevel !== "low";
   const showDecorBars = kind === "window" && decorBars === true;
-  const decorBarsColorKey = decorBarsColor === "gold" ? "gold" : "white";
+  const decorBarsColorKey = decorBarsColor === "gold" || decorBarsColor === "brown" ? decorBarsColor : "white";
   const decorBarsLabel = showDecorBars
     ? t("calculator.preview.decorBarsBadge", { color: t(`common.colors.${decorBarsColorKey}`) })
     : null;
@@ -244,6 +245,13 @@ export function ProductPreview({
         "rgba(255,231,170,0.96)",
         "rgba(220,173,64,0.92)",
         "rgba(164,112,22,0.88)"
+      ] as const;
+    }
+    if (decorBarsColorKey === "brown") {
+      return [
+        "rgba(168,122,84,0.96)",
+        "rgba(128,86,52,0.92)",
+        "rgba(88,55,31,0.88)"
       ] as const;
     }
     return [

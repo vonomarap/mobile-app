@@ -30,6 +30,20 @@ export function PrimaryButton({
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme.colors), [theme.colors]);
   const isDisabled = disabled || loading;
+  const palette =
+    tone === "soft"
+      ? {
+          backgroundColor: theme.colors.surface,
+          borderColor: theme.colors.border,
+          hoverBackgroundColor: theme.colors.surface2,
+          textColor: textColor ?? theme.colors.primary,
+        }
+      : {
+          backgroundColor: theme.colors.primary,
+          borderColor: theme.colors.primary,
+          hoverBackgroundColor: theme.colors.primary,
+          textColor: textColor ?? "#FFFFFF",
+        };
 
   return (
     <Pressable
@@ -43,6 +57,11 @@ export function PrimaryButton({
         return [
           styles.button,
           tone === "soft" ? styles.soft : styles.primary,
+          {
+            backgroundColor: hovered && !isDisabled ? palette.hoverBackgroundColor : palette.backgroundColor,
+            borderColor: palette.borderColor,
+          },
+          tone === "primary" && !isDisabled ? styles.primaryShadow : null,
           buttonStyle,
           hovered && !isDisabled ? styles.hovered : null,
           pressed && !isDisabled ? styles.pressed : null,
@@ -61,8 +80,7 @@ export function PrimaryButton({
       <Text
         style={[
           styles.text,
-          tone === "soft" ? styles.softText : styles.primaryText,
-          textColor ? { color: textColor } : null,
+          { color: palette.textColor },
           textStyle
         ]}
       >
@@ -76,10 +94,10 @@ export function PrimaryButton({
 function makeStyles(colors: { primary: string; primarySoft: string; border: string }): ReturnType<typeof StyleSheet.create> {
   return StyleSheet.create({
     button: {
-      minHeight: 48,
-      borderRadius: radius.md,
+      minHeight: 46,
+      borderRadius: radius.sm,
       paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm,
+      paddingVertical: 10,
       alignItems: "center",
       justifyContent: "center",
       flexDirection: "row",
@@ -94,11 +112,18 @@ function makeStyles(colors: { primary: string; primarySoft: string; border: stri
       backgroundColor: colors.primary
     },
     soft: {
-      backgroundColor: colors.primarySoft,
+      backgroundColor: "#FFFFFF",
       borderColor: colors.border
     },
+    primaryShadow: {
+      shadowColor: "#000000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.12,
+      shadowRadius: 10,
+      elevation: 3,
+    },
     hovered: {
-      opacity: 0.96
+      opacity: 1
     },
     pressed: {
       opacity: 0.9
@@ -109,12 +134,6 @@ function makeStyles(colors: { primary: string; primarySoft: string; border: stri
     text: {
       ...font(800),
       fontSize: 16,
-    },
-    primaryText: {
-      color: "#FFFFFF"
-    },
-    softText: {
-      color: colors.primary
     },
     slot: {
       alignItems: "center",

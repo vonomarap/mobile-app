@@ -1,631 +1,755 @@
-import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import { useTranslation } from "react-i18next";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Image, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
-import { PrimaryButton } from "../components/PrimaryButton";
-import { Card } from "../components/Card";
-import { GlowPressable } from "../components/GlowPressable";
-import { ScreenContainer } from "../components/ScreenContainer";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Animated, Easing, Image, Pressable, StyleSheet, Text, View, useWindowDimensions, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
+import { useTranslation } from "react-i18next";
 import { AppScrollView } from "../components/AppScrollView";
+import { PrimaryButton } from "../components/PrimaryButton";
+import { ScreenContainer } from "../components/ScreenContainer";
 import { SiteFooter } from "../components/SiteFooter";
-import { PromoBanners } from "../components/PromoBanners";
-import { OfficialPartnerBlock } from "../components/OfficialPartnerBlock";
+import { useReduceMotion } from "../hooks/useReduceMotion";
 import type { RootStackParamList } from "../navigation/types";
 import { useCurrency } from "../services/currency-context";
-import { fetchProducts, type Product } from "../services/storefront";
 import { fetchSiteSettings } from "../services/site-settings";
+import { fetchProducts, type Product } from "../services/storefront";
 import { font } from "../theme/font";
-import { radius, spacing } from "../theme/tokens";
+import { spacing } from "../theme/tokens";
 import { useTheme } from "../theme/ThemeProvider";
 import { formatMoney } from "../utils/money";
 
-type Nav = NativeStackNavigationProp<RootStackParamList, "Home">;
+type HomeNavigation = NativeStackNavigationProp<RootStackParamList, "Home">;
+type WorkflowStepKey = "request" | "measurement" | "estimate" | "production" | "installation";
 
-/* ───────── helpers ───────── */
+const HOME_WORKFLOW_STEPS: ReadonlyArray<{ key: WorkflowStepKey; icon: keyof typeof Ionicons.glyphMap }> = [
+  { key: "request", icon: "chatbubble-ellipses-outline" },
+  { key: "measurement", icon: "scan-outline" },
+  { key: "estimate", icon: "calculator-outline" },
+  { key: "production", icon: "build-outline" },
+  { key: "installation", icon: "construct-outline" },
+];
 
-function fmtPrice(p: Product, cur: string, t: (k: string) => string): string {
-  return Number.isFinite(p.priceFrom) && (p.priceFrom ?? 0) > 0
-    ? `${t("product.priceFrom")} ${formatMoney(p.priceFrom as number, cur)}`
-    : t("product.priceOnRequest");
+const OLD_LOCAL_GEO_RE = /канев|kanev|каневск|kanevsk|каневской|каневском|район|district/i;
+
+function sanitizeRegionalText(value?: string | null): string | undefined {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed) return undefined;
+  if (OLD_LOCAL_GEO_RE.test(trimmed)) return undefined;
+  return trimmed;
 }
 
-/* ───────── static data ───────── */
+function compareProductsByPrice(a: Product, b: Product): number {
+  const ap = typeof a.priceFrom === "number" && Number.isFinite(a.priceFrom) ? a.priceFrom : Number.POSITIVE_INFINITY;
+  const bp = typeof b.priceFrom === "number" && Number.isFinite(b.priceFrom) ? b.priceFrom : Number.POSITIVE_INFINITY;
+  if (ap !== bp) return ap - bp;
+  return a.title.localeCompare(b.title, "ru", { sensitivity: "base" });
+}
 
-const STATS = [
-  { valueKey: "home.stat1Value", labelKey: "home.stat1Label", icon: "briefcase-outline" as const },
-  { valueKey: "home.stat2Value", labelKey: "home.stat2Label", icon: "time-outline" as const },
-  { valueKey: "home.stat3Value", labelKey: "home.stat3Label", icon: "headset-outline" as const },
-  { valueKey: "home.stat4Value", labelKey: "home.stat4Label", icon: "shield-checkmark-outline" as const },
-];
+function WorkflowStepCard({
+  stepKey,
+  icon,
+  index,
+  active,
+  reduceMotion,
+}: {
+  stepKey: WorkflowStepKey;
+  icon: keyof typeof Ionicons.glyphMap;
+  index: number;
+  active: boolean;
+  reduceMotion: boolean;
+}): JSX.Element {
+  const { t } = useTranslation();
+  const theme = useTheme();
+  const containerProgress = useRef(new Animated.Value(reduceMotion || active ? 1 : 0)).current;
+  const textProgress = useRef(new Animated.Value(reduceMotion || active ? 1 : 0)).current;
 
-const FEATURES = [
-  { icon: "business-outline" as const, titleKey: "home.feature1Title", textKey: "home.feature1Text" },
-  { icon: "construct-outline" as const, titleKey: "home.feature2Title", textKey: "home.feature2Text" },
-  { icon: "rocket-outline" as const, titleKey: "home.feature3Title", textKey: "home.feature3Text" },
-  { icon: "ribbon-outline" as const, titleKey: "home.feature4Title", textKey: "home.feature4Text" },
-];
+  useEffect(() => {
+    if (reduceMotion) {
+      containerProgress.setValue(1);
+      textProgress.setValue(1);
+      return;
+    }
 
-/* ═══════════════════════════════════════════════
-   HOME SCREEN
-   ═══════════════════════════════════════════════ */
+    if (!active) {
+      return;
+    }
+
+    Animated.parallel([
+      Animated.timing(containerProgress, {
+        toValue: 1,
+        duration: 460,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(textProgress, {
+        toValue: 1,
+        duration: 420,
+        delay: 90,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [active, containerProgress, reduceMotion, textProgress]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.workflowRow,
+        {
+          opacity: containerProgress,
+          transform: [
+            {
+              translateY: containerProgress.interpolate({
+                inputRange: [0, 1],
+                outputRange: [22, 0],
+              }),
+            },
+          ],
+        },
+      ]}
+    >
+      <View style={styles.workflowRail}>
+        <View style={[styles.workflowMarker, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.workflowMarkerText, { color: theme.colors.text }]}>{String(index + 1).padStart(2, "0")}</Text>
+        </View>
+        {index < HOME_WORKFLOW_STEPS.length - 1 ? (
+          <View style={[styles.workflowLine, { backgroundColor: theme.colors.border }]} />
+        ) : null}
+      </View>
+
+      <View style={[styles.workflowCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
+        <View style={styles.workflowCardHeader}>
+          <View style={[styles.workflowIconWrap, { backgroundColor: theme.colors.primarySoft }]}>
+            <Ionicons name={icon} size={18} color={theme.colors.primary} />
+          </View>
+          <Text style={[styles.workflowStepLabel, { color: theme.colors.textMuted }]}>
+            {t("home.steps.stepLabel", { index: index + 1 })}
+          </Text>
+        </View>
+
+        <Animated.View
+          style={{
+            opacity: textProgress,
+            transform: [
+              {
+                translateY: textProgress.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [14, 0],
+                }),
+              },
+            ],
+          }}
+        >
+          <Text style={[styles.workflowCardTitle, { color: theme.colors.text }]}>{t(`home.steps.items.${stepKey}.title`)}</Text>
+          <Text style={[styles.workflowCardText, { color: theme.colors.textMuted }]}>{t(`home.steps.items.${stepKey}.body`)}</Text>
+        </Animated.View>
+      </View>
+    </Animated.View>
+  );
+}
 
 export function HomeScreen(): JSX.Element {
   const { t } = useTranslation();
   const theme = useTheme();
+  const navigation = useNavigation<HomeNavigation>();
+  const reduceMotion = useReduceMotion();
   const currency = useCurrency();
-  const nav = useNavigation<Nav>();
-  const { width } = useWindowDimensions();
-  const isWeb = Platform.OS === "web";
+  const { width, height } = useWindowDimensions();
 
-  /* layout tokens */
   const gutter = width < 420 ? spacing.sm : spacing.md;
-  const heroSplit = width >= 860;
-  const statsWrap = width < 700;
-  const featureCols = width >= 900 ? 4 : width >= 540 ? 2 : 1;
-  const productCols = width >= 1060 ? 3 : width >= 700 ? 2 : 1;
+  const heroTitleSize = width >= 900 ? 56 : width >= 680 ? 44 : 34;
+  const heroTitleLineHeight = width >= 900 ? 62 : width >= 680 ? 50 : 40;
+  const sectionTitleSize = width >= 680 ? 30 : 24;
+  const sectionTitleLineHeight = width >= 680 ? 36 : 30;
+  const tileWidth = width >= 980 ? "31.8%" : width >= 640 ? "48.5%" : "100%";
+  const previewImageHeight = width >= 980 ? 220 : width >= 640 ? 204 : 196;
+  const priceTileWidth = width >= 1120 ? "23.6%" : width >= 860 ? "31.8%" : width >= 640 ? "48.5%" : "100%";
+  const priceImageHeight = width >= 980 ? 188 : width >= 640 ? 168 : 184;
+  const workflowSectionMaxWidth = width >= 1080 ? 860 : 760;
+  const stepOffsetsRef = useRef<number[]>([]);
+  const stepsSectionOffsetRef = useRef(0);
+  const scrollYRef = useRef(0);
+  const [revealedSteps, setRevealedSteps] = useState<boolean[]>(() => HOME_WORKFLOW_STEPS.map(() => false));
 
-  /* queries */
-  const productsQ = useQuery({
+  const productsQuery = useQuery({
     queryKey: ["home", "products"],
     queryFn: fetchProducts,
-    staleTime: 5 * 60_000,
-    gcTime: 30 * 60_000,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
-  const settingsQ = useQuery({
+
+  const siteSettingsQuery = useQuery({
     queryKey: ["app_settings", "site"],
     queryFn: fetchSiteSettings,
-    staleTime: 5 * 60_000,
-    enabled: isWeb,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
-  const featured = useMemo(() => (productsQ.data ?? []).slice(0, 3), [productsQ.data]);
-  const hero = featured[0];
-  const heroPrice = hero ? fmtPrice(hero, currency, t) : t("home.heroFallbackPrice");
+  const settings = siteSettingsQuery.data ?? {};
+  const brandName = sanitizeRegionalText(settings.brandName) || "КанОкна";
+  const pricedProducts = useMemo(
+    () =>
+      [...(productsQuery.data ?? [])]
+        .filter((item) => typeof item.priceFrom === "number" && Number.isFinite(item.priceFrom))
+        .sort(compareProductsByPrice)
+        .slice(0, 4),
+    [productsQuery.data]
+  );
+  const previewProducts = useMemo(() => {
+    const items = productsQuery.data ?? [];
+    if (!items.length) return [];
 
-  /* palette shortcuts */
-  const isDark = theme.isDark;
-  const heroText = isDark ? "#FFF7ED" : "#3B1A08";
-  const heroMuted = isDark ? "rgba(255,247,237,0.72)" : "rgba(59,26,8,0.64)";
-  const heroBorder = isDark ? "rgba(255,255,255,0.10)" : "rgba(122,79,48,0.12)";
-  const sectionKicker = isDark ? "#FDBA74" : "#B45309";
-  const glassAccent = isDark ? "rgba(249,115,22,0.22)" : "rgba(234,88,12,0.10)";
-  const statDivider = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)";
+    const pricedIds = new Set(pricedProducts.map((item) => item.id));
+    const withoutPrices = items.filter((item) => !pricedIds.has(item.id));
 
-  /* card width helpers */
-  const featureWidth = featureCols === 4 ? "23.5%" : featureCols === 2 ? "48%" : "100%";
-  const productWidth = productCols === 3 ? "31.8%" : productCols === 2 ? "48.5%" : "100%";
+    return (withoutPrices.length ? withoutPrices : items).slice(0, 3);
+  }, [pricedProducts, productsQuery.data]);
+
+  const revealWorkflowSteps = useCallback((scrollY: number) => {
+    if (reduceMotion) {
+      return;
+    }
+
+    const threshold = scrollY + height * 0.84;
+    setRevealedSteps((prev) => {
+      let changed = false;
+      const next = prev.map((shown, index) => {
+        if (shown) return true;
+        const localOffset = stepOffsetsRef.current[index];
+        if (typeof localOffset !== "number") return false;
+        const absoluteOffset = stepsSectionOffsetRef.current + localOffset;
+        if (threshold >= absoluteOffset + 24) {
+          changed = true;
+          return true;
+        }
+        return false;
+      });
+      return changed ? next : prev;
+    });
+  }, [height, reduceMotion]);
+
+  useEffect(() => {
+    if (reduceMotion) {
+      setRevealedSteps(HOME_WORKFLOW_STEPS.map(() => true));
+      return;
+    }
+
+    revealWorkflowSteps(scrollYRef.current);
+  }, [reduceMotion, revealWorkflowSteps, width]);
+
+  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const nextY = event.nativeEvent.contentOffset.y ?? 0;
+    scrollYRef.current = nextY;
+    revealWorkflowSteps(nextY);
+  }, [revealWorkflowSteps]);
+
+  const handleStepsSectionLayout = useCallback((event: LayoutChangeEvent) => {
+    stepsSectionOffsetRef.current = event.nativeEvent.layout.y;
+    revealWorkflowSteps(scrollYRef.current);
+  }, [revealWorkflowSteps]);
+
+  const handleWorkflowStepLayout = useCallback((index: number, event: LayoutChangeEvent) => {
+    stepOffsetsRef.current[index] = event.nativeEvent.layout.y;
+    revealWorkflowSteps(scrollYRef.current);
+  }, [revealWorkflowSteps]);
+
+  const showPricesSection = productsQuery.isLoading || pricedProducts.length > 0;
 
   return (
     <ScreenContainer>
       <AppScrollView
         trackNavGlass
+        onScroll={handleScroll}
         contentContainerStyle={[styles.page, { paddingHorizontal: gutter, paddingBottom: 0 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* ╔══════════════════════════════╗
-            ║  1 · HERO                    ║
-            ╚══════════════════════════════╝ */}
-        <LinearGradient
-          colors={isDark
-            ? (["#131315", "#1E1510", "#3A2414"] as const)
-            : (["#FEF7F0", "#FCEADB", "#F4C9A0"] as const)}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.heroShell, { borderColor: heroBorder }]}
-        >
-          {/* decorative blobs */}
-          <View pointerEvents="none" style={[styles.blob1, { backgroundColor: isDark ? "rgba(249,115,22,0.18)" : "rgba(251,146,60,0.22)" }]} />
-          <View pointerEvents="none" style={[styles.blob2, { backgroundColor: isDark ? "rgba(253,186,116,0.10)" : "rgba(234,88,12,0.10)" }]} />
+        <View style={[styles.heroSection, { borderBottomColor: theme.colors.border }]}>
+          <View style={styles.heroMetaRow}>
+            <Text style={[styles.heroMetaBrand, { color: theme.colors.text }]}>{brandName}</Text>
+            <View style={[styles.heroMetaDot, { backgroundColor: theme.colors.border }]} />
+            <Text style={[styles.heroMetaRegion, { color: theme.colors.textMuted }]}>{t("home.kicker")}</Text>
+          </View>
 
-          <View style={[styles.heroInner, heroSplit && styles.heroSplit]}>
-            {/* left copy */}
-            <View style={styles.heroCopy}>
-              <View style={[styles.kickerPill, { borderColor: heroBorder, backgroundColor: isDark ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.60)" }]}>
-                <Ionicons name="diamond-outline" size={13} color={heroText} />
-                <Text style={[styles.kickerLabel, { color: heroText }]}>{t("home.heroKicker")}</Text>
-              </View>
+          <Text
+            style={[
+              styles.heroTitle,
+              {
+                color: theme.colors.text,
+                fontSize: heroTitleSize,
+                lineHeight: heroTitleLineHeight,
+              },
+            ]}
+          >
+            {t("home.title")}
+          </Text>
 
-              <Text style={[styles.heroH1, { color: heroText }]}>{t("home.heroTitle")}</Text>
-              <Text style={[styles.heroP, { color: heroMuted }]}>{t("home.heroSubtitle")}</Text>
+          <Text style={[styles.heroSubtitle, { color: theme.colors.textMuted }]}>{t("home.subtitle")}</Text>
 
-              <View style={styles.heroBtns}>
-                <PrimaryButton
-                  title={t("home.heroCta")}
-                  onPress={() => nav.navigate("Calculator")}
-                  leftSlot={<Ionicons name="calculator-outline" size={18} color="#FFF" />}
-                  buttonStyle={styles.heroBtn}
-                />
-                <PrimaryButton
-                  title={t("home.heroCtaSecondary")}
-                  tone="soft"
-                  onPress={() => nav.navigate("Catalog")}
-                  leftSlot={<Ionicons name="grid-outline" size={18} color={theme.colors.primary} />}
-                  buttonStyle={styles.heroBtn2}
-                />
-              </View>
-            </View>
+          <View style={styles.heroActions}>
+            <PrimaryButton
+              title={t("home.browseCatalog")}
+              onPress={() => navigation.navigate("Catalog")}
+              leftSlot={<Ionicons name="grid-outline" size={18} color="#FFFFFF" />}
+              buttonStyle={styles.primaryButton}
+            />
+            <PrimaryButton
+              title={t("home.openCalculator")}
+              tone="soft"
+              onPress={() => navigation.navigate("Calculator")}
+              leftSlot={<Ionicons name="calculator-outline" size={18} color={theme.colors.primary} />}
+              buttonStyle={styles.secondaryButton}
+            />
+          </View>
+        </View>
 
-            {/* right — hero product card */}
-            <GlowPressable
-              onPress={() => hero ? nav.navigate("ProductDetails", { productId: hero.id }) : nav.navigate("Catalog")}
-              radius={radius.lg}
-              glowColor={theme.colors.primary}
-              style={styles.heroCardWrap}
+        <View style={[styles.section, { borderTopColor: theme.colors.border }]}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionEyebrow, { color: theme.colors.textMuted }]}>{t("home.stepsEyebrow")}</Text>
+            <Text
+              style={[
+                styles.sectionTitle,
+                { color: theme.colors.text, fontSize: sectionTitleSize, lineHeight: sectionTitleLineHeight },
+              ]}
             >
-              <Card variant="solid" padded={false} style={[styles.heroCard, { backgroundColor: theme.colors.surface, borderColor: heroBorder }]}>
-                <View style={styles.heroImg}>
-                  {hero?.image ? (
-                    <Image source={{ uri: hero.image }} style={styles.heroImgFull} resizeMode="cover" />
-                  ) : (
-                    <LinearGradient
-                      colors={isDark ? (["#1A1A1C", "#28282E"] as const) : (["#FAF5EF", "#ECDCC9"] as const)}
-                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                      style={styles.heroImgPlaceholder}
-                    >
-                      <Ionicons name="image-outline" size={32} color={theme.colors.primary} />
-                    </LinearGradient>
-                  )}
-                  {/* label badge */}
-                  <View style={[styles.heroLabel, { backgroundColor: theme.colors.primary }]}>
-                    <Ionicons name="star" size={12} color="#FFF" />
-                    <Text style={styles.heroLabelText}>{t("home.heroProductLabel")}</Text>
-                  </View>
-                </View>
-                <View style={styles.heroCardBody}>
-                  <Text style={[styles.heroCardTitle, { color: theme.colors.text }]} numberOfLines={2}>
-                    {hero?.title || t("home.heroFallbackTitle")}
-                  </Text>
-                  <Text style={[styles.heroCardPrice, { color: theme.colors.primary }]} numberOfLines={1}>
-                    {heroPrice}
-                  </Text>
-                </View>
-              </Card>
-            </GlowPressable>
-          </View>
-        </LinearGradient>
-
-        {/* ╔══════════════════════════════╗
-            ║  2 · STATS BAR               ║
-            ╚══════════════════════════════╝ */}
-        <Card variant="glass" style={[styles.statsBar, statsWrap && styles.statsBarWrap]}>
-          {STATS.map((s, i) => (
-            <View key={s.valueKey} style={[styles.statItem, i > 0 && !statsWrap && { borderLeftWidth: 1, borderLeftColor: statDivider, paddingLeft: spacing.lg }]}>
-              <View style={[styles.statIcon, { backgroundColor: theme.colors.primarySoft }]}>
-                <Ionicons name={s.icon} size={18} color={theme.colors.primary} />
-              </View>
-              <Text style={[styles.statValue, { color: theme.colors.primary }]}>{t(s.valueKey)}</Text>
-              <Text style={[styles.statLabel, { color: theme.colors.textMuted }]}>{t(s.labelKey)}</Text>
-            </View>
-          ))}
-        </Card>
-
-        {/* ╔══════════════════════════════╗
-            ║  3 · WHY CHOOSE US           ║
-            ╚══════════════════════════════╝ */}
-        <View style={styles.section}>
-          <View style={styles.sectionHead}>
-            <Text style={[styles.kicker, { color: sectionKicker }]}>{t("home.featuresKicker")}</Text>
-            <Text style={[styles.sectionH2, { color: theme.colors.text }]}>{t("home.featuresTitle")}</Text>
+              {t("home.stepsTitle")}
+            </Text>
+            <Text style={[styles.sectionSubtitle, { color: theme.colors.textMuted }]}>{t("home.stepsSubtitle")}</Text>
           </View>
 
-          <View style={styles.grid}>
-            {FEATURES.map((f) => (
-              <View key={f.titleKey} style={{ width: featureWidth }}>
-                <Card variant="glass" style={styles.featCard}>
-                  <LinearGradient
-                    colors={isDark
-                      ? (["rgba(249,115,22,0.14)", "rgba(249,115,22,0.04)"] as const)
-                      : (["rgba(234,88,12,0.08)", "rgba(234,88,12,0.02)"] as const)}
-                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                    style={styles.featIconBox}
-                  >
-                    <Ionicons name={f.icon} size={24} color={theme.colors.primary} />
-                  </LinearGradient>
-                  <Text style={[styles.featTitle, { color: theme.colors.text }]}>{t(f.titleKey)}</Text>
-                  <Text style={[styles.featText, { color: theme.colors.textMuted }]}>{t(f.textKey)}</Text>
-                </Card>
+          <View
+            onLayout={handleStepsSectionLayout}
+            style={[styles.workflowList, { maxWidth: workflowSectionMaxWidth }]}
+          >
+            {HOME_WORKFLOW_STEPS.map((item, index) => (
+              <View key={item.key} onLayout={(event) => handleWorkflowStepLayout(index, event)}>
+                <WorkflowStepCard
+                  stepKey={item.key}
+                  icon={item.icon}
+                  index={index}
+                  active={revealedSteps[index] ?? reduceMotion}
+                  reduceMotion={reduceMotion}
+                />
               </View>
             ))}
           </View>
         </View>
 
-        {/* ╔══════════════════════════════╗
-            ║  4 · PRODUCT SHOWCASE        ║
-            ╚══════════════════════════════╝ */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeadRow}>
-            <View style={styles.sectionHead}>
-              <Text style={[styles.kicker, { color: sectionKicker }]}>{t("home.productsKicker")}</Text>
-              <Text style={[styles.sectionH2, { color: theme.colors.text }]}>{t("home.productsTitle")}</Text>
-              <Text style={[styles.sectionP, { color: theme.colors.textMuted }]}>{t("home.productsSubtitle")}</Text>
+        {showPricesSection ? (
+          <View style={[styles.section, { borderTopColor: theme.colors.border }]}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionEyebrow, { color: theme.colors.textMuted }]}>{t("home.pricesEyebrow")}</Text>
+              <Text
+                style={[
+                  styles.sectionTitle,
+                  { color: theme.colors.text, fontSize: sectionTitleSize, lineHeight: sectionTitleLineHeight },
+                ]}
+              >
+                {t("home.pricesTitle")}
+              </Text>
+              <Text style={[styles.sectionSubtitle, { color: theme.colors.textMuted }]}>{t("home.pricesSubtitle")}</Text>
             </View>
-            <PrimaryButton
-              tone="soft"
-              title={t("home.productsAction")}
-              onPress={() => nav.navigate("Catalog")}
-              buttonStyle={styles.sectionBtn}
-              leftSlot={<Ionicons name="grid-outline" size={16} color={theme.colors.primary} />}
-            />
-          </View>
 
-          <View style={styles.grid}>
-            {featured.length ? featured.map((item) => {
-              const img = item.image?.trim() || "";
-              const price = fmtPrice(item, currency, t);
-
-              return (
-                <View key={item.id} style={{ width: productWidth }}>
-                  <GlowPressable
-                    onPress={() => nav.navigate("ProductDetails", { productId: item.id })}
-                    radius={radius.md}
-                    glowColor={theme.colors.primary}
-                  >
-                    <Card variant="solid" padded={false} style={[styles.prodCard, { backgroundColor: theme.colors.surface }]}>
-                      <View style={styles.prodImg}>
-                        {img ? (
-                          <Image source={{ uri: img }} style={styles.prodImgFull} resizeMode="cover" />
-                        ) : (
-                          <LinearGradient
-                            colors={isDark ? (["#1F1F21", "#2C2C32"] as const) : (["#F8F2EB", "#E8D8CB"] as const)}
-                            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                            style={styles.prodImgPlaceholder}
-                          >
-                            <Ionicons name="image-outline" size={24} color={theme.colors.primary} />
-                          </LinearGradient>
-                        )}
+            <View style={styles.tileGrid}>
+              {productsQuery.isLoading
+                ? Array.from({ length: 4 }).map((_, index) => (
+                    <View
+                      key={`price-placeholder-${index}`}
+                      style={[
+                        styles.catalogTile,
+                        styles.catalogTilePlaceholder,
+                        {
+                          width: priceTileWidth,
+                          borderColor: theme.colors.border,
+                          backgroundColor: theme.colors.surface,
+                        },
+                      ]}
+                    >
+                      <View style={[styles.placeholderMedia, { height: priceImageHeight, backgroundColor: theme.colors.surface2 }]} />
+                      <View style={styles.catalogTileBody}>
+                        <Text style={[styles.catalogTileTitle, { color: theme.colors.text }]}>{t("common.loading")}</Text>
+                        <Text style={[styles.priceValue, { color: theme.colors.primary }]}>{t("common.loading")}</Text>
                       </View>
-                      <View style={styles.prodBody}>
-                        <Text style={[styles.prodTitle, { color: theme.colors.text }]} numberOfLines={2}>{item.title}</Text>
-                        <Text style={[styles.prodDesc, { color: theme.colors.textMuted }]} numberOfLines={2}>
-                          {item.description || t("home.productsFallback")}
-                        </Text>
-                        <View style={styles.prodFooter}>
-                          <Text style={[styles.prodPrice, { color: theme.colors.primary }]} numberOfLines={1}>{price}</Text>
-                          <View style={[styles.prodArrow, { backgroundColor: theme.colors.primarySoft }]}>
-                            <Ionicons name="arrow-forward" size={14} color={theme.colors.primary} />
+                    </View>
+                  ))
+                : pricedProducts.map((item) => (
+                    <Pressable
+                      key={item.id}
+                      accessibilityRole="button"
+                      onPress={() => navigation.navigate("ProductDetails", { productId: item.id })}
+                      style={[styles.tilePressable, { width: priceTileWidth }]}
+                    >
+                      {({ pressed }) => (
+                        <View
+                          style={[
+                            styles.catalogTile,
+                            {
+                              borderColor: theme.colors.border,
+                              backgroundColor: theme.colors.surface,
+                            },
+                            pressed ? styles.pressed : null,
+                          ]}
+                        >
+                          <View style={[styles.previewMedia, { height: priceImageHeight, backgroundColor: theme.colors.surface2 }]}>
+                            {item.image ? (
+                              <Image source={{ uri: item.image }} style={styles.previewImage} resizeMode="cover" />
+                            ) : (
+                              <View style={styles.previewFallback}>
+                                <Ionicons name="pricetag-outline" size={22} color={theme.colors.textMuted} />
+                              </View>
+                            )}
+                          </View>
+
+                          <View style={styles.catalogTileBody}>
+                            <Text style={[styles.catalogTileTitle, { color: theme.colors.text }]} numberOfLines={2}>
+                              {item.title}
+                            </Text>
+                            <Text style={[styles.priceValue, { color: theme.colors.primary }]}>
+                              {t("product.priceFrom")} {formatMoney(item.priceFrom as number, currency)}
+                            </Text>
+                            <Text style={[styles.catalogTileBodyText, { color: theme.colors.textMuted }]} numberOfLines={2}>
+                              {item.description || t("home.productsFallback")}
+                            </Text>
+                            <Text style={[styles.catalogTileAction, { color: theme.colors.primary }]}>{t("home.pricesCardAction")}</Text>
                           </View>
                         </View>
-                      </View>
-                    </Card>
-                  </GlowPressable>
-                </View>
-              );
-            }) : (
-              <Card variant="solid" style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
-                <Ionicons name="cube-outline" size={28} color={theme.colors.primary} style={{ marginBottom: spacing.sm }} />
-                <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>{t("home.productsEmpty")}</Text>
-                <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>{t("home.productsEmptyHint")}</Text>
-              </Card>
-            )}
+                      )}
+                    </Pressable>
+                  ))}
+            </View>
           </View>
+        ) : null}
+
+        <View style={[styles.section, { borderTopColor: theme.colors.border }]}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionEyebrow, { color: theme.colors.textMuted }]}>{t("home.catalogEyebrow")}</Text>
+            <Text
+              style={[
+                styles.sectionTitle,
+                { color: theme.colors.text, fontSize: sectionTitleSize, lineHeight: sectionTitleLineHeight },
+              ]}
+            >
+              {t("home.catalogTitle")}
+            </Text>
+            <Text style={[styles.sectionSubtitle, { color: theme.colors.textMuted }]}>{t("home.catalogSubtitle")}</Text>
+          </View>
+
+          <View style={styles.tileGrid}>
+            {productsQuery.isLoading
+              ? Array.from({ length: 3 }).map((_, index) => (
+                  <View
+                    key={`placeholder-${index}`}
+                    style={[
+                      styles.catalogTile,
+                      styles.catalogTilePlaceholder,
+                      {
+                        width: tileWidth,
+                        borderColor: theme.colors.border,
+                        backgroundColor: theme.colors.surface,
+                      },
+                    ]}
+                  >
+                    <View style={[styles.placeholderMedia, { height: previewImageHeight, backgroundColor: theme.colors.surface2 }]} />
+                    <View style={styles.catalogTileBody}>
+                      <Text style={[styles.catalogTileTitle, { color: theme.colors.text }]}>{t("common.loading")}</Text>
+                      <Text style={[styles.catalogTileBodyText, { color: theme.colors.textMuted }]}>{t("home.productsEmptyHint")}</Text>
+                    </View>
+                  </View>
+                ))
+              : previewProducts.length
+              ? previewProducts.map((item) => (
+                  <Pressable
+                    key={item.id}
+                    accessibilityRole="button"
+                    onPress={() => navigation.navigate("ProductDetails", { productId: item.id })}
+                    style={[styles.tilePressable, { width: tileWidth }]}
+                  >
+                    {({ pressed }) => (
+                      <View
+                        style={[
+                          styles.catalogTile,
+                          {
+                            borderColor: theme.colors.border,
+                            backgroundColor: theme.colors.surface,
+                          },
+                          pressed ? styles.pressed : null,
+                        ]}
+                      >
+                        <View style={[styles.previewMedia, { height: previewImageHeight, backgroundColor: theme.colors.surface2 }]}>
+                          {item.image ? (
+                            <Image source={{ uri: item.image }} style={styles.previewImage} resizeMode="cover" />
+                          ) : (
+                            <View style={styles.previewFallback}>
+                              <Ionicons name="image-outline" size={22} color={theme.colors.textMuted} />
+                            </View>
+                          )}
+                        </View>
+
+                        <View style={styles.catalogTileBody}>
+                          <Text style={[styles.catalogTileTitle, { color: theme.colors.text }]} numberOfLines={2}>
+                            {item.title}
+                          </Text>
+                          <Text style={[styles.catalogTileBodyText, { color: theme.colors.textMuted }]} numberOfLines={2}>
+                            {item.description || t("home.productsFallback")}
+                          </Text>
+                          <Text style={[styles.catalogTileAction, { color: theme.colors.primary }]}>{t("home.catalogCardAction")}</Text>
+                        </View>
+                      </View>
+                    )}
+                  </Pressable>
+                ))
+              : (
+                <View style={[styles.catalogEmpty, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
+                  <Text style={[styles.catalogEmptyTitle, { color: theme.colors.text }]}>{t("home.productsEmpty")}</Text>
+                  <Text style={[styles.catalogEmptyText, { color: theme.colors.textMuted }]}>{t("home.productsEmptyHint")}</Text>
+                </View>
+              )}
+          </View>
+
         </View>
 
-        {/* ╔══════════════════════════════╗
-            ║  5 · PROMO BANNERS           ║
-            ╚══════════════════════════════╝ */}
-        <PromoBanners placement="home" />
-
-        {/* ╔══════════════════════════════╗
-            ║  6 · OFFICIAL PARTNER        ║
-            ╚══════════════════════════════╝ */}
-        <OfficialPartnerBlock settings={settingsQ.data} />
-
-        {/* ╔══════════════════════════════╗
-            ║  7 · RICH CTA                ║
-            ╚══════════════════════════════╝ */}
-        <LinearGradient
-          colors={isDark
-            ? (["#18171A", "#271B10", "#4F2810"] as const)
-            : (["#FFF8F0", "#F6E6D2", "#E8BF90"] as const)}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.ctaShell, { borderColor: heroBorder }]}
-        >
-          <View pointerEvents="none" style={[styles.ctaBlob, { backgroundColor: glassAccent }]} />
-
-          <Text style={[styles.kicker, { color: isDark ? "#FDBA74" : "#92400E" }]}>{t("home.ctaKicker")}</Text>
-          <Text style={[styles.ctaH2, { color: heroText }]}>{t("home.ctaTitle")}</Text>
-          <Text style={[styles.ctaP, { color: heroMuted }]}>{t("home.ctaSubtitle")}</Text>
-
-          <View style={styles.ctaCards}>
-            <GlowPressable
-              onPress={() => nav.navigate("Calculator")}
-              radius={radius.md}
-              glowColor={theme.colors.primary}
-              style={styles.ctaCardWrap}
-            >
-              <Card variant="solid" padded style={[styles.ctaCard, { backgroundColor: theme.colors.surface, borderColor: heroBorder }]}>
-                <View style={[styles.ctaIconBox, { backgroundColor: theme.colors.primarySoft }]}>
-                  <Ionicons name="calculator-outline" size={26} color={theme.colors.primary} />
-                </View>
-                <View style={styles.ctaCardText}>
-                  <Text style={[styles.ctaCardH3, { color: theme.colors.text }]}>{t("home.ctaCalcTitle")}</Text>
-                  <Text style={[styles.ctaCardP, { color: theme.colors.textMuted }]}>{t("home.ctaCalcText")}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={theme.colors.primary} />
-              </Card>
-            </GlowPressable>
-
-            <GlowPressable
-              onPress={() => nav.navigate("Catalog")}
-              radius={radius.md}
-              glowColor={theme.colors.primary}
-              style={styles.ctaCardWrap}
-            >
-              <Card variant="solid" padded style={[styles.ctaCard, { backgroundColor: theme.colors.surface, borderColor: heroBorder }]}>
-                <View style={[styles.ctaIconBox, { backgroundColor: theme.colors.primarySoft }]}>
-                  <Ionicons name="grid-outline" size={26} color={theme.colors.primary} />
-                </View>
-                <View style={styles.ctaCardText}>
-                  <Text style={[styles.ctaCardH3, { color: theme.colors.text }]}>{t("home.ctaCatalogTitle")}</Text>
-                  <Text style={[styles.ctaCardP, { color: theme.colors.textMuted }]}>{t("home.ctaCatalogText")}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={theme.colors.primary} />
-              </Card>
-            </GlowPressable>
-          </View>
-        </LinearGradient>
-
-        {/* footer */}
         <SiteFooter gutter={gutter} />
       </AppScrollView>
     </ScreenContainer>
   );
 }
 
-/* ═══════════════════════════════════════════════
-   STYLES
-   ═══════════════════════════════════════════════ */
-
 const styles = StyleSheet.create({
-  page: { gap: spacing.xl + 8 },
-
-  /* ── hero ── */
-  heroShell: {
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    padding: spacing.lg + 4,
-    overflow: "hidden",
-    position: "relative",
+  page: {
+    gap: 0,
   },
-  blob1: {
-    position: "absolute",
-    top: -80,
-    right: -50,
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    opacity: 0.7,
+  heroSection: {
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xl,
+    gap: spacing.md,
+    borderBottomWidth: 1,
   },
-  blob2: {
-    position: "absolute",
-    bottom: -60,
-    left: -40,
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    opacity: 0.5,
-  },
-  heroInner: { gap: spacing.lg + 4 },
-  heroSplit: { flexDirection: "row", alignItems: "center" },
-  heroCopy: { flex: 1, gap: spacing.md, zIndex: 2 },
-  kickerPill: {
-    alignSelf: "flex-start",
-    height: 34,
-    paddingHorizontal: 14,
-    borderRadius: 999,
-    borderWidth: 1,
+  heroMetaRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
-    gap: 8,
+    gap: 10,
   },
-  kickerLabel: {
+  heroMetaBrand: {
     ...font(800),
-    fontSize: 11,
-    letterSpacing: 0.5,
+    fontSize: 12,
+    lineHeight: 16,
     textTransform: "uppercase",
   },
-  heroH1: {
+  heroMetaDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 999,
+  },
+  heroMetaRegion: {
+    ...font(500),
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  heroTitle: {
     ...font(900),
-    fontSize: 44,
-    lineHeight: 50,
-    letterSpacing: -1.1,
-    maxWidth: 580,
+    maxWidth: 820,
   },
-  heroP: {
+  heroSubtitle: {
+    ...font(500),
+    maxWidth: 620,
     fontSize: 16,
-    lineHeight: 25,
-    maxWidth: 520,
-    ...font(400),
+    lineHeight: 24,
   },
-  heroBtns: {
+  heroActions: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing.sm,
-    paddingTop: spacing.sm,
   },
-  heroBtn: { minWidth: 210, minHeight: 52 },
-  heroBtn2: { minWidth: 170, minHeight: 52 },
-
-  /* hero product card */
-  heroCardWrap: { flex: 1, minWidth: 260, maxWidth: 400 },
-  heroCard: { overflow: "hidden" },
-  heroImg: {
-    height: 280,
-    overflow: "hidden",
-    borderTopLeftRadius: radius.md,
-    borderTopRightRadius: radius.md,
-    position: "relative",
+  primaryButton: {
+    minHeight: 48,
+    borderRadius: 8,
+    paddingHorizontal: 18,
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
-  heroImgFull: { width: "100%", height: "100%" },
-  heroImgPlaceholder: { flex: 1, alignItems: "center", justifyContent: "center" },
-  heroLabel: {
-    position: "absolute",
-    top: spacing.sm,
-    left: spacing.sm,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 10,
-    height: 28,
-    borderRadius: 999,
+  secondaryButton: {
+    minHeight: 48,
+    borderRadius: 8,
+    paddingHorizontal: 18,
   },
-  heroLabelText: { ...font(800), fontSize: 11, color: "#FFF", letterSpacing: 0.2 },
-  heroCardBody: { padding: spacing.md, gap: spacing.xs },
-  heroCardTitle: { ...font(900), fontSize: 20, lineHeight: 26 },
-  heroCardPrice: { ...font(800), fontSize: 15 },
-
-  /* ── stats bar ── */
-  statsBar: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.md,
+  section: {
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.xl,
     gap: spacing.lg,
+    borderTopWidth: 1,
   },
-  statsBarWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "center",
-  },
-  statItem: {
-    alignItems: "center",
-    gap: 6,
-    minWidth: 100,
-    paddingVertical: spacing.xs,
-  },
-  statIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 2,
-  },
-  statValue: { ...font(900), fontSize: 26, lineHeight: 30, letterSpacing: -0.4 },
-  statLabel: { ...font(500), fontSize: 12, lineHeight: 16, textAlign: "center" },
-
-  /* ── sections ── */
-  section: { gap: spacing.lg },
-  sectionHeadRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    gap: spacing.md,
-  },
-  sectionHead: { flex: 1, minWidth: 240, gap: spacing.sm },
-  kicker: {
-    ...font(800),
-    fontSize: 12,
-    letterSpacing: 0.4,
-    textTransform: "uppercase",
-  },
-  sectionH2: {
-    ...font(900),
-    fontSize: 30,
-    lineHeight: 36,
-    letterSpacing: -0.6,
+  sectionHeader: {
+    gap: 8,
     maxWidth: 640,
   },
-  sectionP: { fontSize: 15, lineHeight: 22, maxWidth: 560 },
-  sectionBtn: { minHeight: 44 },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
-
-  /* ── feature cards ── */
-  featCard: { gap: spacing.sm, minHeight: 170 },
-  featIconBox: {
+  workflowList: {
+    width: "100%",
+    alignSelf: "center",
+    gap: 0,
+  },
+  workflowRow: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "stretch",
+    gap: spacing.md,
+  },
+  workflowRail: {
     width: 48,
-    height: 48,
-    borderRadius: 14,
+    alignItems: "center",
+    flexShrink: 0,
+  },
+  workflowMarker: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 2,
   },
-  featTitle: { ...font(800), fontSize: 16, lineHeight: 20 },
-  featText: { fontSize: 14, lineHeight: 21 },
-
-  /* ── product cards ── */
-  prodCard: { overflow: "hidden" },
-  prodImg: {
-    height: 210,
-    overflow: "hidden",
-    borderTopLeftRadius: radius.md,
-    borderTopRightRadius: radius.md,
+  workflowMarkerText: {
+    ...font(800),
+    fontSize: 12,
+    lineHeight: 16,
   },
-  prodImgFull: { width: "100%", height: "100%" },
-  prodImgPlaceholder: { flex: 1, alignItems: "center", justifyContent: "center" },
-  prodBody: { padding: spacing.md, gap: spacing.sm },
-  prodTitle: { ...font(900), fontSize: 18, lineHeight: 22 },
-  prodDesc: { fontSize: 14, lineHeight: 20, minHeight: 40 },
-  prodFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: spacing.xs },
-  prodPrice: { ...font(800), fontSize: 15 },
-  prodArrow: {
-    width: 30,
-    height: 30,
+  workflowLine: {
+    width: 2,
+    flex: 1,
+    marginTop: spacing.xs,
+    borderRadius: 999,
+    minHeight: 42,
+  },
+  workflowCard: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  workflowCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  workflowIconWrap: {
+    width: 34,
+    height: 34,
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
+    flexShrink: 0,
   },
-
-  /* empty state */
-  emptyState: { width: "100%", alignItems: "center", paddingVertical: spacing.xl },
-  emptyTitle: { ...font(800), fontSize: 17 },
-  emptyText: { fontSize: 14, lineHeight: 20, textAlign: "center", maxWidth: 340 },
-
-  /* ── CTA ── */
-  ctaShell: {
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    padding: spacing.lg + 4,
-    gap: spacing.sm,
-    overflow: "hidden",
-    position: "relative",
+  workflowStepLabel: {
+    ...font(800),
+    fontSize: 11,
+    lineHeight: 16,
+    textTransform: "uppercase",
   },
-  ctaBlob: {
-    position: "absolute",
-    bottom: -40,
-    right: -30,
-    width: 180,
-    height: 180,
-    borderRadius: 90,
-    opacity: 0.6,
-  },
-  ctaH2: {
+  workflowCardTitle: {
     ...font(900),
-    fontSize: 28,
-    lineHeight: 34,
-    letterSpacing: -0.5,
-    maxWidth: 580,
+    fontSize: 22,
+    lineHeight: 28,
   },
-  ctaP: { fontSize: 15, lineHeight: 22, maxWidth: 520 },
-  ctaCards: {
+  workflowCardText: {
+    ...font(500),
+    fontSize: 15,
+    lineHeight: 22,
+    marginTop: 6,
+    maxWidth: 620,
+  },
+  sectionEyebrow: {
+    ...font(800),
+    fontSize: 12,
+    lineHeight: 16,
+    textTransform: "uppercase",
+  },
+  sectionTitle: {
+    ...font(900),
+  },
+  sectionSubtitle: {
+    ...font(500),
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  tileGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing.md,
-    marginTop: spacing.md,
-    zIndex: 2,
   },
-  ctaCardWrap: { flex: 1, minWidth: 240 },
-  ctaCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
+  tilePressable: {
+    minWidth: 0,
   },
-  ctaIconBox: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
+  catalogTile: {
+    overflow: "hidden",
+    borderWidth: 1,
+    borderRadius: 8,
+  },
+  catalogTilePlaceholder: {
+    minHeight: 280,
+  },
+  previewMedia: {
+    overflow: "hidden",
+  },
+  placeholderMedia: {
+    opacity: 0.85,
+  },
+  previewImage: {
+    width: "100%",
+    height: "100%",
+  },
+  previewFallback: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
   },
-  ctaCardText: { flex: 1, gap: 3 },
-  ctaCardH3: { ...font(800), fontSize: 16 },
-  ctaCardP: { fontSize: 13, lineHeight: 18 },
+  catalogTileBody: {
+    padding: 14,
+    gap: 8,
+  },
+  catalogTileTitle: {
+    ...font(800),
+    fontSize: 18,
+    lineHeight: 24,
+  },
+  catalogTileBodyText: {
+    ...font(500),
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  priceValue: {
+    ...font(900),
+    fontSize: 22,
+    lineHeight: 28,
+  },
+  catalogTileAction: {
+    ...font(800),
+    fontSize: 12,
+    lineHeight: 16,
+    textTransform: "uppercase",
+  },
+  catalogEmpty: {
+    width: "100%",
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: spacing.lg,
+    gap: spacing.sm,
+  },
+  catalogEmptyTitle: {
+    ...font(800),
+    fontSize: 18,
+    lineHeight: 24,
+  },
+  catalogEmptyText: {
+    ...font(500),
+    fontSize: 14,
+    lineHeight: 20,
+    maxWidth: 480,
+  },
+  pressed: {
+    opacity: 0.92,
+  },
 });

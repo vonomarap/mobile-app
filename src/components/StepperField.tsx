@@ -50,6 +50,8 @@ export function StepperField({
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [focused, setFocused] = useState(false);
+  const [decHovered, setDecHovered] = useState(false);
+  const [incHovered, setIncHovered] = useState(false);
 
   const raw = value ?? "";
   const numeric = toFiniteNumber(raw, NaN);
@@ -100,14 +102,17 @@ export function StepperField({
           accessibilityRole="button"
           disabled={!canDec}
           onPress={() => stepBy(-1)}
+          onHoverIn={() => setDecHovered(true)}
+          onHoverOut={() => setDecHovered(false)}
           style={({ pressed }) => [
             styles.stepBtn,
             styles.stepBtnLeft,
+            decHovered && canDec ? styles.stepBtnHovered : null,
             !canDec ? styles.stepBtnDisabled : null,
             pressed && canDec ? styles.stepBtnPressed : null
           ]}
         >
-          <Ionicons name="remove" size={18} color={!canDec ? theme.colors.textMuted : theme.colors.primary} />
+          <Ionicons name="remove" size={18} color={!canDec ? theme.colors.textMuted : theme.colors.text} />
         </Pressable>
 
         <View style={styles.valueWrap}>
@@ -136,14 +141,17 @@ export function StepperField({
           accessibilityRole="button"
           disabled={!canInc}
           onPress={() => stepBy(1)}
+          onHoverIn={() => setIncHovered(true)}
+          onHoverOut={() => setIncHovered(false)}
           style={({ pressed }) => [
             styles.stepBtn,
             styles.stepBtnRight,
+            incHovered && canInc ? styles.stepBtnHovered : null,
             !canInc ? styles.stepBtnDisabled : null,
             pressed && canInc ? styles.stepBtnPressed : null
           ]}
         >
-          <Ionicons name="add" size={18} color={!canInc ? theme.colors.textMuted : theme.colors.primary} />
+          <Ionicons name="add" size={18} color={!canInc ? theme.colors.textMuted : theme.colors.text} />
         </Pressable>
       </View>
     </View>
@@ -170,11 +178,11 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
       marginTop: 1
     },
     controlRow: {
-      minHeight: 46,
+      minHeight: 48,
       borderWidth: 1,
       borderColor: theme.colors.border,
       borderRadius: radius.sm,
-      backgroundColor: theme.colors.surface2,
+      backgroundColor: theme.colors.surface,
       flexDirection: "row",
       alignItems: "stretch",
       overflow: "hidden"
@@ -186,9 +194,10 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
       opacity: 0.6
     },
     stepBtn: {
-      width: 48,
+      width: 46,
       alignItems: "center",
       justifyContent: "center",
+      backgroundColor: theme.colors.surface,
       // Remove browser focus ring/outline on web after click/tap.
       ...( { outlineStyle: "none", outlineWidth: 0, WebkitTapHighlightColor: "transparent" } as object ),
       ...( { cursor: "pointer" } as object )
@@ -201,11 +210,15 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
       borderLeftWidth: 1,
       borderLeftColor: theme.colors.border,
     },
+    stepBtnHovered: {
+      backgroundColor: theme.colors.surface2
+    },
     stepBtnPressed: {
-      opacity: 0.9
+      backgroundColor: theme.colors.surface2,
+      opacity: 0.88
     },
     stepBtnDisabled: {
-      opacity: 0.5
+      opacity: 0.42
     },
     valueWrap: {
       flex: 1,
@@ -220,7 +233,8 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
       color: theme.colors.text,
       textAlign: "center",
       paddingVertical: 10,
-      minWidth: 52
+      minWidth: 52,
+      ...( { outlineStyle: "none", outlineWidth: 0 } as object )
     },
     valueText: {
       ...theme.typography.bodyRegular,

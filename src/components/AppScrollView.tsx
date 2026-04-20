@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { forwardRef, useCallback, useEffect } from "react";
 import type { NativeScrollEvent, NativeSyntheticEvent, ScrollViewProps } from "react-native";
 import { Platform, ScrollView, StyleSheet, useWindowDimensions } from "react-native";
 import { useNavGlassControls } from "../services/scroll-context";
@@ -8,13 +8,13 @@ type Props = ScrollViewProps & {
   trackNavGlass?: boolean;
 };
 
-export function AppScrollView({
+export const AppScrollView = forwardRef<ScrollView, Props>(function AppScrollView({
   trackNavGlass = false,
   onScroll,
   scrollEventThrottle,
   contentContainerStyle,
   ...rest
-}: Props): JSX.Element {
+}: Props, ref): JSX.Element {
   const theme = useTheme();
   const { width } = useWindowDimensions();
   const { setScrollY } = useNavGlassControls();
@@ -49,10 +49,11 @@ export function AppScrollView({
 
   return (
     <ScrollView
+      ref={ref}
       {...rest}
       contentContainerStyle={nextContentContainerStyle}
       onScroll={trackNavGlass ? handleScroll : onScroll}
       scrollEventThrottle={trackNavGlass && Platform.OS === "web" ? (scrollEventThrottle ?? 16) : scrollEventThrottle}
     />
   );
-}
+});

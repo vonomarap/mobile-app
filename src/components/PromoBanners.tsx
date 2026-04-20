@@ -12,8 +12,82 @@ import { fetchPromoBanners, PromoBanner, PromoBannerKind, PromoBannerPlacement }
 
 const AUTO_ROTATE_MS = 8_400;
 const SWITCH_ANIM_MS = 1100;
-const BANNER_HEIGHT = 152;
 const HIGH_PRIORITY_MIN = 15;
+
+type BannerLayoutMetrics = {
+  bannerHeight: number;
+  mediaWidth: number;
+  webPadX: number;
+  webPadY: number;
+  contentPad: number;
+  textGap: number;
+  pillPadX: number;
+  pillPadY: number;
+  pillFontSize: number;
+  titleFontSize: number;
+  titleLineHeight: number;
+  subtitleFontSize: number;
+  subtitleLineHeight: number;
+  validityFontSize: number;
+  validityLineHeight: number;
+  arrowInset: number;
+  arrowButtonSize: number;
+  arrowIconSize: number;
+};
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+// Keep one responsive sizing model so every banner placement scales the same way.
+function getBannerLayoutMetrics({
+  pageWidth,
+  windowWidth
+}: {
+  pageWidth: number;
+  windowWidth: number;
+}): BannerLayoutMetrics {
+  const isWeb = Platform.OS === "web";
+  const isDesktopWeb = isWeb && windowWidth >= 900;
+  const isWideDesktop = isWeb && windowWidth >= 1280;
+  const isTablet = pageWidth >= 680;
+  const isCompact = pageWidth < 360;
+
+  const bannerHeight = isDesktopWeb
+    ? clamp(Math.round(pageWidth * 0.22), 216, 252)
+    : isTablet
+    ? clamp(Math.round(pageWidth * 0.3), 194, 214)
+    : isCompact
+    ? 174
+    : 188;
+
+  const mediaWidth = isDesktopWeb
+    ? clamp(Math.round(pageWidth * 0.39), 260, 430)
+    : isTablet
+    ? clamp(Math.round(pageWidth * 0.36), 212, 300)
+    : clamp(Math.round(pageWidth * 0.35), 148, 190);
+
+  return {
+    bannerHeight,
+    mediaWidth,
+    webPadX: isWeb ? (isWideDesktop ? 14 : isDesktopWeb ? 16 : isTablet ? 12 : 8) : 0,
+    webPadY: isWeb ? (isDesktopWeb ? 18 : isTablet ? 12 : 8) : 0,
+    contentPad: isDesktopWeb ? 18 : isTablet ? 16 : 14,
+    textGap: isDesktopWeb ? 8 : 6,
+    pillPadX: isDesktopWeb ? 12 : 10,
+    pillPadY: isDesktopWeb ? 5 : 4,
+    pillFontSize: isDesktopWeb ? 12 : 11,
+    titleFontSize: isDesktopWeb ? 20 : isTablet ? 17 : 16,
+    titleLineHeight: isDesktopWeb ? 25 : isTablet ? 22 : 20,
+    subtitleFontSize: isDesktopWeb ? 14 : 13,
+    subtitleLineHeight: isDesktopWeb ? 19 : 17,
+    validityFontSize: isDesktopWeb ? 12 : 11,
+    validityLineHeight: isDesktopWeb ? 16 : 15,
+    arrowInset: isWeb ? (isDesktopWeb ? 12 : 8) : 6,
+    arrowButtonSize: isDesktopWeb ? 36 : 32,
+    arrowIconSize: isDesktopWeb ? 20 : 18
+  };
+}
 
 function isHighPriority(value?: number): boolean {
   const v = typeof value === "number" ? value : Number(value);
@@ -149,21 +223,15 @@ function PromoBannerSlide({
   item,
   kind,
   cardWidth,
-  mediaWidth,
-  webPadX,
-  webPadY,
+  layout,
   reduceMotion,
-  index,
   isActive,
 }: {
   item: PromoBanner;
   kind: PromoBannerKind;
   cardWidth: number;
-  mediaWidth: number;
-  webPadX: number;
-  webPadY: number;
+  layout: BannerLayoutMetrics;
   reduceMotion: boolean;
-  index: number;
   isActive: boolean;
 }): JSX.Element {
   const theme = useTheme();
@@ -243,7 +311,6 @@ function PromoBannerSlide({
     ? "rgba(148,163,184,0.04)"
     : "rgba(148,163,184,0.06)";
 
-  const fxWidth = Math.max(0, Math.round(cardWidth - webPadX * 2));
   const constantGlow = featuredWeb && isWinter;
 
   const glowWebStyle =
@@ -251,7 +318,7 @@ function PromoBannerSlide({
       ? (({
           // Keep the glow inside the slide padding to avoid ugly clipping by the ScrollView.
           boxShadow: (() => {
-            const outer = Math.max(10, Math.round(webPadY * 0.95));
+            const outer = Math.max(10, Math.round(layout.webPadY * 0.95));
             const mid = Math.max(8, Math.round(outer * 0.65));
             return `0 0 0 1px rgba(56,189,248,0.46), 0 0 ${mid}px rgba(56,189,248,0.34), 0 0 ${outer}px rgba(56,189,248,0.22)`;
           })(),
@@ -316,7 +383,7 @@ function PromoBannerSlide({
 
   const content = (
     <Card style={[styles.card, { borderRadius: radius.lg }]} padded={false} elevated>
-      <View style={styles.stage}>
+      <View style={[styles.stage, { height: layout.bannerHeight }]}>
         {isWinter ? (
           <LinearGradient
             pointerEvents="none"
@@ -331,26 +398,67 @@ function PromoBannerSlide({
           />
         ) : null}
 
-        <View style={styles.inner}>
-          <View style={styles.textCol}>
-            <View style={styles.textTop}>
+        <View style={[styles.inner, { height: layout.bannerHeight }]}>
+          <View style={[styles.textCol, { padding: layout.contentPad }]}>
+            <View style={[styles.textTop, { gap: layout.textGap }]}>
               {isWinter || isPromo ? (
-                <View style={[styles.pill, { backgroundColor: pillBg }]}>
-                  <Text style={[styles.pillText, { color: pillText }]}>{kindLabel(kind)}</Text>
+                <View
+                  style={[
+                    styles.pill,
+                    {
+                      backgroundColor: pillBg,
+                      paddingHorizontal: layout.pillPadX,
+                      paddingVertical: layout.pillPadY
+                    }
+                  ]}
+                >
+                  <Text style={[styles.pillText, { color: pillText, fontSize: layout.pillFontSize }]}>
+                    {kindLabel(kind)}
+                  </Text>
                 </View>
               ) : null}
-              <Text style={[styles.title, { color: theme.colors.text }]} numberOfLines={2}>
+              <Text
+                style={[
+                  styles.title,
+                  {
+                    color: theme.colors.text,
+                    fontSize: layout.titleFontSize,
+                    lineHeight: layout.titleLineHeight
+                  }
+                ]}
+                numberOfLines={2}
+              >
                 {item.title}
               </Text>
               {item.subtitle ? (
-                <Text style={[styles.subtitle, { color: theme.colors.textMuted }]} numberOfLines={2}>
+                <Text
+                  style={[
+                    styles.subtitle,
+                    {
+                      color: theme.colors.textMuted,
+                      fontSize: layout.subtitleFontSize,
+                      lineHeight: layout.subtitleLineHeight
+                    }
+                  ]}
+                  numberOfLines={2}
+                >
                   {item.subtitle}
                 </Text>
               ) : null}
             </View>
 
             {validityLabel ? (
-              <Text style={[styles.validityText, { color: validityTextColor }]} numberOfLines={1}>
+              <Text
+                style={[
+                  styles.validityText,
+                  {
+                    color: validityTextColor,
+                    fontSize: layout.validityFontSize,
+                    lineHeight: layout.validityLineHeight
+                  }
+                ]}
+                numberOfLines={1}
+              >
                 {validityLabel}
               </Text>
             ) : null}
@@ -360,7 +468,7 @@ function PromoBannerSlide({
             style={[
               styles.media,
               {
-                width: mediaWidth,
+                width: layout.mediaWidth,
                 backgroundColor: theme.colors.surface2,
                 borderLeftColor: theme.isDark ? "rgba(255,255,255,0.10)" : theme.colors.border
               }
@@ -392,7 +500,7 @@ function PromoBannerSlide({
   const zIndex = featuredWeb ? (isActive ? 30 : 20) : 1;
   const outerStyle = {
     width: cardWidth,
-    paddingVertical: webPadY,
+    paddingVertical: layout.webPadY,
     position: "relative" as const,
     zIndex,
     overflow: "visible" as const
@@ -401,14 +509,14 @@ function PromoBannerSlide({
   if (!featuredWeb) {
     return (
       <View style={outerStyle}>
-        <View style={{ paddingHorizontal: webPadX }}>{content}</View>
+        <View style={{ paddingHorizontal: layout.webPadX }}>{content}</View>
       </View>
     );
   }
 
   return (
     <View style={outerStyle}>
-      <View style={{ paddingHorizontal: webPadX }}>
+      <View style={{ paddingHorizontal: layout.webPadX }}>
 	        <Animated.View style={{ transform: [{ scale }] }}>
 	          <Pressable
 	            onPressIn={constantGlow ? undefined : () => setPress(1)}
@@ -474,14 +582,15 @@ export function PromoBanners({ placement }: { placement: PromoBannerPlacement })
   const safeWidth = Number.isFinite(rawWidth) && rawWidth > 0 ? rawWidth : 360;
   const pageWidth = safeWidth;
   const cardWidth = pageWidth;
-  const mediaWidth = Math.min(320, Math.max(160, Math.round(cardWidth * 0.32)));
+  const bannerLayout = useMemo(
+    () => getBannerLayoutMetrics({ pageWidth, windowWidth }),
+    [pageWidth, windowWidth]
+  );
   const canPaginate = items.length > 1 && Number.isFinite(pageWidth) && pageWidth > 0;
   const isDesktopWeb = Platform.OS === "web" && windowWidth >= 900;
   const showArrows = isDesktopWeb && canPaginate;
   const switchMs = isDesktopWeb ? 520 : SWITCH_ANIM_MS;
-  const webPadX = Platform.OS === "web" ? Math.min(54, Math.max(16, Math.round(cardWidth * 0.05))) : 0;
-  const webPadY = Platform.OS === "web" ? Math.min(26, Math.max(10, Math.round(webPadX * 0.55))) : 0;
-  const arrowsInset = Platform.OS === "web" ? Math.max(6, Math.min(28, Math.round(webPadX * 0.6))) : 6;
+  const arrowsInset = bannerLayout.arrowInset;
 
   const stopTrackAnimation = useCallback(() => {
     animSeq.current += 1;
@@ -643,11 +752,8 @@ export function PromoBanners({ placement }: { placement: PromoBannerPlacement })
               item={item}
               kind={normalizeKind(item.kind)}
               cardWidth={cardWidth}
-              mediaWidth={mediaWidth}
-              webPadX={webPadX}
-              webPadY={webPadY}
+              layout={bannerLayout}
               reduceMotion={reduceMotion}
-              index={index}
               isActive={index === activeIndex}
             />
           ))}
@@ -662,6 +768,9 @@ export function PromoBanners({ placement }: { placement: PromoBannerPlacement })
 	            style={({ pressed }: { pressed: boolean }) => [
 	              styles.arrowButton,
               {
+                width: bannerLayout.arrowButtonSize,
+                height: bannerLayout.arrowButtonSize,
+                borderRadius: bannerLayout.arrowButtonSize / 2,
                 backgroundColor: theme.isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)",
                 borderColor: theme.isDark ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.10)",
                 opacity: pressed ? 0.7 : 0.32
@@ -670,7 +779,7 @@ export function PromoBanners({ placement }: { placement: PromoBannerPlacement })
           >
             <Ionicons
               name="chevron-back"
-              size={18}
+              size={bannerLayout.arrowIconSize}
               color={theme.isDark ? "rgba(255,255,255,0.74)" : "rgba(0,0,0,0.64)"}
             />
 	          </Pressable>
@@ -681,6 +790,9 @@ export function PromoBanners({ placement }: { placement: PromoBannerPlacement })
 	            style={({ pressed }: { pressed: boolean }) => [
 	              styles.arrowButton,
               {
+                width: bannerLayout.arrowButtonSize,
+                height: bannerLayout.arrowButtonSize,
+                borderRadius: bannerLayout.arrowButtonSize / 2,
                 backgroundColor: theme.isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)",
                 borderColor: theme.isDark ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.10)",
                 opacity: pressed ? 0.7 : 0.32
@@ -689,7 +801,7 @@ export function PromoBanners({ placement }: { placement: PromoBannerPlacement })
           >
             <Ionicons
               name="chevron-forward"
-              size={18}
+              size={bannerLayout.arrowIconSize}
               color={theme.isDark ? "rgba(255,255,255,0.74)" : "rgba(0,0,0,0.64)"}
             />
           </Pressable>
@@ -718,8 +830,7 @@ const styles = StyleSheet.create({
   },
   stage: {
     position: "relative",
-    width: "100%",
-    height: BANNER_HEIGHT
+    width: "100%"
   },
   slidePressable: {
     position: "relative",
@@ -734,41 +845,27 @@ const styles = StyleSheet.create({
   inner: {
     flexDirection: "row",
     alignItems: "stretch",
-    height: BANNER_HEIGHT
   },
   textCol: {
     flex: 1,
-    padding: spacing.sm,
     justifyContent: "space-between",
     minWidth: 0
   },
-  textTop: {
-    gap: 6
-  },
+  textTop: {},
   pill: {
     alignSelf: "flex-start",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
     borderRadius: 999
   },
   pillText: {
     ...font(800),
-    fontSize: 11,
     letterSpacing: 0.2
   },
   title: {
-    ...font(900),
-    fontSize: 15,
-    lineHeight: 19
+    ...font(900)
   },
-  subtitle: {
-    fontSize: 12,
-    lineHeight: 16
-  },
+  subtitle: {},
   validityText: {
     ...font(700),
-    fontSize: 11,
-    lineHeight: 14,
     letterSpacing: 0.15
   },
   media: {
@@ -822,9 +919,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6
   },
   arrowButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1

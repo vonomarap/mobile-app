@@ -1,6 +1,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
-import type { QuoteOrderItemDraft } from "../navigation/types";
+import type {
+  QuoteCalcOrderItemDraft,
+  QuoteMoskitkiOrderItemDraft,
+  QuoteOrderItemDraft,
+  QuoteOrderItemPreview,
+} from "../navigation/types";
 
 const CART_STORAGE_KEY = "windowDoorStore.cart.v1";
 
@@ -29,6 +34,43 @@ function toNumber(value: unknown): number {
   return Number.isFinite(num) ? num : 0;
 }
 
+function sanitizePositiveInt(value: unknown): number | null {
+  const num = Math.round(toNumber(value));
+  return num > 0 ? num : null;
+}
+
+function sanitizeMoney(value: unknown): number | null {
+  const num = Math.round(toNumber(value) * 100) / 100;
+  return num > 0 ? num : null;
+}
+
+function sanitizePreview(value: unknown, fallbackTotal?: number): QuoteOrderItemPreview | null {
+  const safeFallback = Number.isFinite(fallbackTotal) ? Math.max(0, Math.round((fallbackTotal ?? 0) * 100) / 100) : 0;
+
+  if (!isRecord(value)) {
+    if (!safeFallback) return null;
+    return {
+      subtotal: safeFallback,
+      total: safeFallback,
+      currency: "RUB",
+    };
+  }
+
+  const currencyRaw = value.currency;
+  const subtotalRaw = Math.max(0, toNumber(value.subtotal));
+  const totalRaw = Math.max(0, toNumber(value.total));
+  const subtotal = subtotalRaw || safeFallback;
+  const total = totalRaw || subtotal || safeFallback;
+  const currency = typeof currencyRaw === "string" && currencyRaw.trim() ? currencyRaw.trim().toUpperCase() : "RUB";
+
+  return {
+    subtotal,
+    total,
+    currency,
+    calcDto: value.calcDto as QuoteOrderItemPreview["calcDto"],
+  };
+}
+
 function sanitizeCartItem(value: unknown): QuoteOrderItemDraft | null {
   if (!isRecord(value)) return null;
 
@@ -37,24 +79,47 @@ function sanitizeCartItem(value: unknown): QuoteOrderItemDraft | null {
   const previewRaw = value.preview;
 
   if (typeof localIdRaw !== "string" || !localIdRaw.trim()) return null;
-  if (!isRecord(calcInputRaw)) return null;
-  if (!isRecord(previewRaw)) return null;
 
-  const currencyRaw = previewRaw.currency;
-  const subtotal = Math.max(0, toNumber(previewRaw.subtotal));
-  const total = Math.max(0, toNumber(previewRaw.total));
-  const currency = typeof currencyRaw === "string" && currencyRaw.trim() ? currencyRaw.trim().toUpperCase() : "RUB";
+  if (value.kind === "moskitki" && isRecord(value.moskitki)) {
+    const widthMm = sanitizePositiveInt(value.moskitki.widthMm);
+    const heightMm = sanitizePositiveInt(value.moskitki.heightMm);
+    const quantity = sanitizePositiveInt(value.moskitki.quantity);
+    const pricePerItem = sanitizeMoney(value.moskitki.pricePerItem);
+
+    if (!widthMm || !heightMm || !quantity || !pricePerItem) return null;
+
+    const total = Math.round(pricePerItem * quantity * 100) / 100;
+    const preview = sanitizePreview(previewRaw, total);
+    if (!preview) return null;
+
+    return {
+      kind: "moskitki",
+      localId: localIdRaw.trim(),
+      moskitki: {
+        widthMm,
+        heightMm,
+        quantity,
+        pricePerItem,
+        title: typeof value.moskitki.title === "string" && value.moskitki.title.trim() ? value.moskitki.title.trim() : undefined,
+      },
+      preview: {
+        ...preview,
+        subtotal: total,
+        total,
+      },
+    } satisfies QuoteMoskitkiOrderItemDraft;
+  }
+
+  if (!isRecord(calcInputRaw)) return null;
+  const preview = sanitizePreview(previewRaw);
+  if (!preview) return null;
 
   return {
-    localId: localIdRaw,
-    calcInput: calcInputRaw as QuoteOrderItemDraft["calcInput"],
-    preview: {
-      subtotal,
-      total,
-      currency,
-      calcDto: previewRaw.calcDto as QuoteOrderItemDraft["preview"]["calcDto"],
-    },
-  };
+    kind: value.kind === "calc" ? "calc" : undefined,
+    localId: localIdRaw.trim(),
+    calcInput: calcInputRaw as QuoteCalcOrderItemDraft["calcInput"],
+    preview,
+  } satisfies QuoteCalcOrderItemDraft;
 }
 
 function sanitizeCartState(value: unknown): CartState {

@@ -1,10 +1,10 @@
 import "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Platform, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Platform, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useFonts } from "expo-font";
 import { useTranslation } from "react-i18next";
 import { AppNavigator } from "./src/navigation/AppNavigator";
@@ -18,34 +18,17 @@ import { robotoFonts } from "./src/theme/roboto-fonts";
 import { defaultFontFamily } from "./src/theme/font";
 import { fetchSiteSettings } from "./src/services/site-settings";
 import { hydrateLanguagePreference } from "./src/services/i18n";
+import { trackSiteVisitOnce } from "./src/services/public-analytics";
 
 const queryClient = new QueryClient();
 
 export default function App(): JSX.Element {
   const [fontsLoaded] = useFonts(robotoFonts as any);
-  const didSetDefaults = useRef(false);
 
   useEffect(() => {
     void hydrateLanguagePreference();
   }, []);
 
-  useEffect(() => {
-    if (!fontsLoaded) return;
-    if (didSetDefaults.current) return;
-    didSetDefaults.current = true;
-
-    const TextAny = Text as any;
-    TextAny.defaultProps = TextAny.defaultProps || {};
-    const existingTextStyle = TextAny.defaultProps.style;
-    const existingTextStyles = Array.isArray(existingTextStyle) ? existingTextStyle : existingTextStyle ? [existingTextStyle] : [];
-    TextAny.defaultProps.style = [{ fontFamily: defaultFontFamily }, ...existingTextStyles];
-
-    const InputAny = TextInput as any;
-    InputAny.defaultProps = InputAny.defaultProps || {};
-    const existingInputStyle = InputAny.defaultProps.style;
-    const existingInputStyles = Array.isArray(existingInputStyle) ? existingInputStyle : existingInputStyle ? [existingInputStyle] : [];
-    InputAny.defaultProps.style = [{ fontFamily: defaultFontFamily }, ...existingInputStyles];
-  }, [fontsLoaded]);
 
   if (!fontsLoaded && Platform.OS !== "web") {
     return (
@@ -82,6 +65,14 @@ function AppShell(): JSX.Element {
   const { t } = useTranslation();
   const theme = useTheme();
   const isWeb = Platform.OS === "web";
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!isWeb) return;
+    void trackSiteVisitOnce().finally(() => {
+      void queryClient.invalidateQueries({ queryKey: ["app_settings", "public_analytics"] });
+    });
+  }, [isWeb, queryClient]);
 
   const siteSettingsQuery = useQuery({
     queryKey: ["app_settings", "site"],
@@ -98,11 +89,12 @@ function AppShell(): JSX.Element {
 
   const SEO_BASE_URL = "https://kanokna.web.app";
   const SEO_OG_IMAGES = {
-    home: `${SEO_BASE_URL}/og-image.png`,
-    catalog: `${SEO_BASE_URL}/og-catalog.png`,
-    gallery: `${SEO_BASE_URL}/og-gallery.png`,
-    calculator: `${SEO_BASE_URL}/og-calculator.png`,
-    contacts: `${SEO_BASE_URL}/og-contacts.png`,
+    home: `${SEO_BASE_URL}/og-image-v3.png`,
+    catalog: `${SEO_BASE_URL}/og-catalog-v3.png`,
+    gallery: `${SEO_BASE_URL}/og-gallery-v3.png`,
+    calculator: `${SEO_BASE_URL}/og-calculator-v3.png`,
+    contacts: `${SEO_BASE_URL}/og-contacts-v3.png`,
+    product: `${SEO_BASE_URL}/og-catalog-v3.png`,
   } as const;
   const SEO_DEFAULT_DESCRIPTION =
     "Окна и двери на заказ в Каневской и Каневском районе. Замер, изготовление и монтаж. Рассчитайте стоимость в калькуляторе и оставьте заявку.";
@@ -122,6 +114,9 @@ function AppShell(): JSX.Element {
         break;
       case "Gallery":
         page = `Галерея работ`;
+        break;
+      case "Faq":
+        page = t("help.title");
         break;
       case "Calculator":
         page = `Калькулятор стоимости окон и дверей`;
@@ -198,6 +193,8 @@ function AppShell(): JSX.Element {
           return SEO_OG_IMAGES.calculator;
         case "Contacts":
           return SEO_OG_IMAGES.contacts;
+        case "ProductDetails":
+          return SEO_OG_IMAGES.product;
         case "Home":
         default:
           return SEO_OG_IMAGES.home;
@@ -206,17 +203,27 @@ function AppShell(): JSX.Element {
 
     const isIndexable =
       routeName === "Home" ||
+      routeName === "Faq" ||
       routeName === "Catalog" ||
       routeName === "Gallery" ||
       routeName === "Calculator" ||
-      routeName === "Contacts";
+      routeName === "Contacts" ||
+      routeName === "ProductDetails";
 
     const canonical = (() => {
       if (!isIndexable) return `${SEO_BASE_URL}/`;
       if (routeName === "Home") return `${SEO_BASE_URL}/`;
+      if (routeName === "Faq") {
+        if (pathname.startsWith("/faq")) return `${SEO_BASE_URL}${pathname}`;
+        return `${SEO_BASE_URL}/faq`;
+      }
       if (routeName === "Catalog") return `${SEO_BASE_URL}/catalog`;
       if (routeName === "Gallery") return `${SEO_BASE_URL}/gallery`;
       if (routeName === "Contacts") return `${SEO_BASE_URL}/contacts`;
+      if (routeName === "ProductDetails") {
+        if (pathname.startsWith("/product/")) return `${SEO_BASE_URL}${pathname}`;
+        return `${SEO_BASE_URL}/product`;
+      }
       if (routeName === "Calculator") {
         // Keep /calculator/window and /calculator/door canonical if present.
         if (pathname.startsWith("/calculator")) return `${SEO_BASE_URL}${pathname}`;
@@ -236,6 +243,11 @@ function AppShell(): JSX.Element {
           return {
             title: `Галерея работ | ${brandName}`,
             description: "Примеры установленных окон и дверей. Посмотрите фото наших работ в Каневской и Каневском районе."
+          };
+        case "Faq":
+          return {
+            title: `${t("help.title")} | ${brandName}`,
+            description: t("help.subtitle")
           };
         case "Calculator":
           return {
@@ -275,7 +287,7 @@ function AppShell(): JSX.Element {
         case "ProductDetails":
           return {
             title: `Товар | ${brandName}`,
-            description: SEO_DEFAULT_DESCRIPTION
+            description: "Карточка товара с описанием, характеристиками и переходом в калькулятор стоимости."
           };
         case "Home":
         default:

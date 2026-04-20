@@ -3,6 +3,18 @@ import type { ImageSourcePropType } from "react-native";
 import profileDepth60 from "../../assets/calc/profile-depth-60.png";
 import profileDepth70 from "../../assets/calc/profile-depth-70.png";
 import profileDepth85 from "../../assets/calc/profile-depth-85.png";
+import profileBautex58 from "../../assets/calc/profile-models/profile-bautex-58.webp";
+import profileKbe58 from "../../assets/calc/profile-models/profile-kbe-58.webp";
+import profileKbeExpert70 from "../../assets/calc/profile-models/profile-kbe-expert-70.webp";
+import profileKbe76 from "../../assets/calc/profile-models/profile-kbe-76.webp";
+import profileRehauBlitzNew from "../../assets/calc/profile-models/profile-rehau-blitz-new.webp";
+import profileRehauThermoDesign from "../../assets/calc/profile-models/profile-rehau-thermo-design.webp";
+import profileRehauGrazio from "../../assets/calc/profile-models/profile-rehau-grazio.webp";
+import profileRehauDelightDesign from "../../assets/calc/profile-models/profile-rehau-delight-design.webp";
+import profileRehauIntelio from "../../assets/calc/profile-models/profile-rehau-intelio.webp";
+import profileRehauGeneo from "../../assets/calc/profile-models/profile-rehau-geneo.webp";
+import profileKommerling70Ad from "../../assets/calc/profile-models/profile-kommerling-70-ad.webp";
+import profileKommerling76Ad from "../../assets/calc/profile-models/profile-kommerling-76-ad.webp";
 import glazingSingle from "../../assets/calc/glazing-single.png";
 import glazingDouble from "../../assets/calc/glazing-double.png";
 import laminationNone from "../../assets/calc/lamination-none.png";
@@ -21,6 +33,21 @@ export const profileDepthPreview: Record<"60" | "70" | "85", ImageSourcePropType
   "60": profileDepth60,
   "70": profileDepth70,
   "85": profileDepth85,
+};
+
+export const profileModelPreview: Partial<Record<string, ImageSourcePropType>> = {
+  bautex_58: profileBautex58,
+  kbe_58: profileKbe58,
+  kbe_expert_70: profileKbeExpert70,
+  kbe_76: profileKbe76,
+  rehau_blitz_new: profileRehauBlitzNew,
+  rehau_thermo_design: profileRehauThermoDesign,
+  rehau_grazio: profileRehauGrazio,
+  rehau_delight_design: profileRehauDelightDesign,
+  rehau_intelio: profileRehauIntelio,
+  rehau_geneo: profileRehauGeneo,
+  kommerling_70_ad: profileKommerling70Ad,
+  kommerling_76_ad: profileKommerling76Ad,
 };
 
 export const glazingPreview: Record<"single" | "double", ImageSourcePropType> = {

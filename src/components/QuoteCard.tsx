@@ -29,6 +29,7 @@ export function QuoteCard({ quote, onPress }: { quote: Quote; onPress?: () => vo
       : "primary";
 
   const pill = getPillColors(theme.isDark, tone, theme.colors);
+  const isPreliminaryQuote = statusCode === "NEW" || statusCode === "IN_REVIEW";
 
   const content = (
     <Card style={styles.card}>
@@ -44,6 +45,11 @@ export function QuoteCard({ quote, onPress }: { quote: Quote; onPress?: () => vo
           {formatMoney(quote.totalPrice ?? 0, quote.currency ?? currency)}
         </Text>
       </View>
+      {isPreliminaryQuote ? (
+        <Text style={[styles.priceNote, { color: theme.colors.textMuted }]}>
+          {t("quotes.details.preliminaryShort")}
+        </Text>
+      ) : null}
     </Card>
   );
 
@@ -103,7 +109,10 @@ const styles = StyleSheet.create({
   price: {
     ...font(700),
     fontSize: 16,
-  }
+  },
+  priceNote: {
+    fontSize: 12,
+  },
 });
 
 function getPillColors(

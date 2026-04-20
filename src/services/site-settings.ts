@@ -5,8 +5,10 @@ export type SiteSettings = {
   brandName?: string;
   tagline?: string;
   phone?: string;
+  email?: string;
   whatsapp?: string;
   telegram?: string;
+  maxUrl?: string;
   copyrightText?: string;
 
   // Home: "Official partner" block (web)
@@ -56,8 +58,10 @@ export async function fetchSiteSettings(): Promise<SiteSettings> {
     brandName: asTrimmedString(data.brandName),
     tagline: asTrimmedString(data.tagline),
     phone: asTrimmedString(data.phone),
+    email: asTrimmedString(data.email),
     whatsapp: asTrimmedString(data.whatsapp),
     telegram: asTrimmedString(data.telegram),
+    maxUrl: asTrimmedString(data.maxUrl),
     copyrightText: asTrimmedString(data.copyrightText),
 
     partnerEnabled: asBoolean(data.partnerEnabled),

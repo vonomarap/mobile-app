@@ -4,10 +4,8 @@ import {
   Animated,
   Easing,
   Image,
-  Modal,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -20,22 +18,26 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useTranslation } from "react-i18next";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { Card } from "../components/Card";
-import { AppScrollView } from "../components/AppScrollView";
 import { CollapsibleSection } from "../components/CollapsibleSection";
+import { AppScrollView } from "../components/AppScrollView";
 import { HelpIcon } from "../components/HelpIcon";
 import { HelpModal } from "../components/HelpModal";
+import { PriceBreakdownList } from "../components/PriceBreakdownList";
 import { ProductPreview } from "../components/ProductPreview";
 import { PromoBanners } from "../components/PromoBanners";
 import { PickerField } from "../components/PickerField";
+import { RangeField } from "../components/RangeField";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { ScreenHeader } from "../components/ScreenHeader";
+import { SelectListModal, type SelectListOption } from "../components/SelectListModal";
+import { SectionTabs } from "../components/SectionTabs";
 import { SegmentedControl } from "../components/SegmentedControl";
 import { SiteFooter } from "../components/SiteFooter";
 import { StepperField } from "../components/StepperField";
 import { SwitchField } from "../components/SwitchField";
 import { RootStackParamList, type QuoteOrderItemDraft } from "../navigation/types";
 import { font } from "../theme/font";
-import { spacing } from "../theme/tokens";
+import { radius, spacing } from "../theme/tokens";
 import { useTheme } from "../theme/ThemeProvider";
 import { Ionicons } from "@expo/vector-icons";
 import { ICON_SIZE, calculatorSectionIcon } from "../theme/iconography";
@@ -43,14 +45,38 @@ import { formatMoney } from "../utils/money";
 import { useCurrencyControls } from "../services/currency-context";
 import { useCart } from "../services/cart-context";
 import { fetchCalcConfig } from "../services/calc-config";
-import { CalcInput, calculateQuote, type HandleSide, type LaminationColor, type SashOpening } from "../utils/calc";
-import { designPreview, glazingPreview, laminationColorPreview, profileDepthPreview } from "../assets/calc-previews";
-import { radius } from "../theme/tokens";
+import {
+  CalcInput,
+  calculateQuote,
+  getDefaultCalcConfig,
+  type GlassOptionsInput,
+  type HandleSide,
+  type LaminationColor,
+  type SashOpening
+} from "../utils/calc";
+import { designPreview, glazingPreview, laminationColorPreview, profileDepthPreview, profileModelPreview } from "../assets/calc-previews";
 
 function cloneCalcInput(input: CalcInput): CalcInput {
   return JSON.parse(JSON.stringify(input)) as CalcInput;
 }
 
+type ProfileCatalogItem = {
+  key: string;
+  label: string;
+  brand: string;
+  depthMm?: number;
+  chambers?: number;
+  thermalCoefficient?: string;
+  description: string;
+  legacySeries?: string;
+  legacyDepthMm?: number;
+};
+
+type HardwareCatalogItem = {
+  key: string;
+  label: string;
+  description?: string;
+};
 
 export function CalculatorScreen(): JSX.Element {
   const { t } = useTranslation();
@@ -62,19 +88,21 @@ export function CalculatorScreen(): JSX.Element {
   const isWeb = Platform.OS === "web";
   const isDesktopWeb = isWeb && screenWidth >= theme.layout.desktopNavMinWidth;
   const desktopContent = isDesktopWeb ? styles.desktopContent : null;
+  const defaultUiCatalog = useMemo(() => getDefaultCalcConfig().uiCatalog ?? {}, []);
 
   type Toggle = "off" | "on";
   type SashCount = "1" | "2" | "3";
   type OpeningSashes = "0" | "1" | "2" | "3";
+  type GlassOptionSelection = "none" | "energySaving" | "multiFunctional";
   type IoniconName = ComponentProps<typeof Ionicons>["name"];
   type DesignOption = "none" | "outside" | "inside" | "twoSideWhite" | "twoSideColor";
   type EditorKey = "dimensions" | "construction" | "profile" | "glazing" | "design" | "extras";
 
-  const [openEditorKey, setOpenEditorKey] = useState<EditorKey | null>(null);
+  const [activeEditorKey, setActiveEditorKey] = useState<EditorKey>("construction");
 
   useFocusEffect(
     useCallback(() => {
-      setOpenEditorKey(null);
+      setActiveEditorKey("construction");
     }, [])
   );
 
@@ -108,12 +136,11 @@ export function CalculatorScreen(): JSX.Element {
   const [hardwareKey, setHardwareKey] = useState<string | null>(null);
   const [hardwareLabel, setHardwareLabel] = useState<string | null>(null);
 
-  const [profileSeries, setProfileSeries] = useState<"bautex" | "kbe" | "rehau">("kbe");
-  const [profileDepthMm, setProfileDepthMm] = useState<"60" | "70" | "85">("70");
+  const [profileModel, setProfileModel] = useState("kbe_expert_70");
+  const [expandedProfileBrand, setExpandedProfileBrand] = useState<string | null>(null);
 
   const [glazing, setGlazing] = useState<"single" | "double">("double");
-  const [energySaving, setEnergySaving] = useState<Toggle>("off");
-  const [multiFunctional, setMultiFunctional] = useState<Toggle>("off");
+  const [selectedGlassOption, setSelectedGlassOption] = useState<GlassOptionSelection>("none");
 
   const [designOption, setDesignOption] = useState<DesignOption>("none");
   const [designPickerOpen, setDesignPickerOpen] = useState(false);
@@ -123,6 +150,13 @@ export function CalculatorScreen(): JSX.Element {
   const designDropdownAnchorRef = useRef<View | null>(null);
   const designPickerProgress = useRef(new Animated.Value(0)).current;
   const designPickerAnimRef = useRef<Animated.CompositeAnimation | null>(null);
+  const [hardwarePickerOpen, setHardwarePickerOpen] = useState(false);
+  const [hardwarePickerMounted, setHardwarePickerMounted] = useState(false);
+  const [hardwarePickerAnchorHeight, setHardwarePickerAnchorHeight] = useState(0);
+  const [hardwarePickerRect, setHardwarePickerRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const hardwareDropdownAnchorRef = useRef<View | null>(null);
+  const hardwarePickerProgress = useRef(new Animated.Value(0)).current;
+  const hardwarePickerAnimRef = useRef<Animated.CompositeAnimation | null>(null);
   const [sashOpeningPickerOpen, setSashOpeningPickerOpen] = useState(false);
   const [sashOpeningPickerMounted, setSashOpeningPickerMounted] = useState(false);
   const [sashOpeningPickerSashIndex, setSashOpeningPickerSashIndex] = useState<number | null>(null);
@@ -148,32 +182,93 @@ export function CalculatorScreen(): JSX.Element {
   const [dripEdgeWidthCm, setDripEdgeWidthCm] = useState<"6" | "9" | "11" | "13">("9");
   const [casing, setCasing] = useState<Toggle>("off");
   const [decorBars, setDecorBars] = useState<Toggle>("off");
-  const [decorBarsColor, setDecorBarsColor] = useState<"white" | "gold">("white");
+  const [decorBarsColor, setDecorBarsColor] = useState<"white" | "gold" | "brown">("white");
 
   const orderItemSeqRef = useRef(1);
   const { items: orderItems, addItem } = useCart();
   const { currency } = useCurrencyControls();
   const [hasCalculated, setHasCalculated] = useState(false);
   const [calculatedTotal, setCalculatedTotal] = useState<number | null>(null);
-  const [calcLoading, setCalcLoading] = useState(false);
-  const calcTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [helpKey, setHelpKey] = useState<string | null>(null);
 
   const calcConfigQuery = useQuery({ queryKey: ["calc_config"], queryFn: fetchCalcConfig });
 
-  const hardwareCatalog = useMemo(() => {
-    const raw = calcConfigQuery.data?.uiCatalog?.hardwareOptions;
+  const profileCatalog = useMemo<ProfileCatalogItem[]>(() => {
+    const raw = calcConfigQuery.data?.uiCatalog?.profileModels ?? defaultUiCatalog.profileModels;
     if (!Array.isArray(raw)) return [];
     return raw
-      .map((item) => {
+      .flatMap((item) => {
+        const key = typeof item?.key === "string" ? item.key.trim().toLowerCase() : "";
+        if (!key || item?.enabled === false) return [];
+        const label =
+          typeof item?.label === "string" && item.label.trim()
+            ? item.label.trim()
+            : t(`calculator.profileModels.${key}`, { defaultValue: key });
+        return [{
+          key,
+          label,
+          brand:
+            typeof item?.brand === "string" && item.brand.trim()
+              ? item.brand.trim()
+              : label.split(" ")[0] ?? label,
+          depthMm: typeof item?.depthMm === "number" ? item.depthMm : undefined,
+          chambers: typeof item?.chambers === "number" ? item.chambers : undefined,
+          thermalCoefficient:
+            typeof item?.thermalCoefficient === "string" && item.thermalCoefficient.trim()
+              ? item.thermalCoefficient.trim()
+              : undefined,
+          description: typeof item?.description === "string" ? item.description.trim() : "",
+          legacySeries: typeof item?.legacySeries === "string" ? item.legacySeries.trim().toLowerCase() : undefined,
+          legacyDepthMm: typeof item?.legacyDepthMm === "number" ? item.legacyDepthMm : undefined,
+        }];
+      })
+  }, [calcConfigQuery.data?.uiCatalog?.profileModels, defaultUiCatalog.profileModels, t]);
+
+  const selectedProfileModel = useMemo(
+    () => profileCatalog.find((item) => item.key === profileModel) ?? profileCatalog[0] ?? null,
+    [profileCatalog, profileModel]
+  );
+
+  useEffect(() => {
+    if (!profileCatalog.length) return;
+    if (!selectedProfileModel || selectedProfileModel.key !== profileModel) {
+      setProfileModel(profileCatalog[0].key);
+    }
+  }, [profileCatalog, profileModel, selectedProfileModel]);
+
+  const glassOptionItems = useMemo<Array<{ value: GlassOptionSelection; label: string }>>(
+    () => [
+      { value: "none", label: t("calculator.glassOptionNone") },
+      { value: "energySaving", label: t("calculator.energySaving") },
+      { value: "multiFunctional", label: t("calculator.multiFunctional") },
+    ],
+    [t]
+  );
+
+  const hardwareCatalog = useMemo<HardwareCatalogItem[]>(() => {
+    const raw = calcConfigQuery.data?.uiCatalog?.hardwareOptions ?? defaultUiCatalog.hardwareOptions;
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .flatMap((item) => {
         const key = typeof item?.key === "string" ? item.key.trim().toLowerCase() : "";
         const label = typeof item?.label === "string" ? item.label.trim() : "";
         const enabled = item?.enabled !== false;
-        if (!enabled || !key || !label) return null;
-        return { key, label };
+        if (!enabled || !key || !label) return [];
+        return [{
+          key,
+          label,
+          description: typeof item?.description === "string" ? item.description.trim() : undefined,
+        }];
       })
-      .filter((v): v is { key: string; label: string } => Boolean(v));
-  }, [calcConfigQuery.data]);
+  }, [calcConfigQuery.data?.uiCatalog?.hardwareOptions, defaultUiCatalog.hardwareOptions]);
+
+  const hardwareAvailable = useMemo(() => {
+    if (productType !== "window") return true;
+    const desiredCount = Math.min(3, Math.max(1, Number(sashCount) || 1));
+    return windowSashes
+      .slice(0, desiredCount)
+      .some((sash) => sash.opening === "turn" || sash.opening === "tiltTurn");
+  }, [productType, sashCount, windowSashes]);
 
   useEffect(() => {
     if (!hardwareCatalog.length) {
@@ -191,13 +286,10 @@ export function CalculatorScreen(): JSX.Element {
   }, [hardwareCatalog, hardwareKey, hardwareLabel]);
 
   useEffect(() => {
-    return () => {
-      if (calcTimerRef.current) {
-        clearTimeout(calcTimerRef.current);
-        calcTimerRef.current = null;
-      }
-    };
-  }, []);
+    if (!hardwareAvailable && hardwarePickerOpen) {
+      setHardwarePickerOpen(false);
+    }
+  }, [hardwareAvailable, hardwarePickerOpen]);
 
   useEffect(() => {
     if (designOption === "none") {
@@ -380,16 +472,22 @@ export function CalculatorScreen(): JSX.Element {
   }, [doorSubtype, openingSashes, openingType, productType, sashCount]);
 
   useEffect(() => {
-    if (openEditorKey !== "design" && designPickerOpen) {
+    if (activeEditorKey !== "design" && designPickerOpen) {
       setDesignPickerOpen(false);
     }
-  }, [designPickerOpen, openEditorKey]);
+  }, [activeEditorKey, designPickerOpen]);
 
   useEffect(() => {
-    if (openEditorKey !== "construction" && sashOpeningPickerOpen) {
+    if (activeEditorKey !== "construction" && hardwarePickerOpen) {
+      setHardwarePickerOpen(false);
+    }
+  }, [activeEditorKey, hardwarePickerOpen]);
+
+  useEffect(() => {
+    if (activeEditorKey !== "construction" && sashOpeningPickerOpen) {
       setSashOpeningPickerOpen(false);
     }
-  }, [openEditorKey, sashOpeningPickerOpen]);
+  }, [activeEditorKey, sashOpeningPickerOpen]);
 
   useEffect(() => {
     if (productType !== "window" && sashOpeningPickerOpen) {
@@ -408,6 +506,11 @@ export function CalculatorScreen(): JSX.Element {
       setSashOpeningPickerOpen(false);
     }
   }, [sashCount, sashOpeningPickerOpen, sashOpeningPickerSashIndex]);
+
+  useEffect(() => {
+    if (hardwareCatalog.length || !hardwarePickerOpen) return;
+    setHardwarePickerOpen(false);
+  }, [hardwareCatalog.length, hardwarePickerOpen]);
 
   const measureDesignPickerAnchor = () => {
     const node = designDropdownAnchorRef.current;
@@ -433,6 +536,10 @@ export function CalculatorScreen(): JSX.Element {
       return;
     }
 
+    if (hardwarePickerOpen) {
+      setHardwarePickerOpen(false);
+    }
+
     if (sashOpeningPickerOpen) {
       setSashOpeningPickerOpen(false);
     }
@@ -440,6 +547,44 @@ export function CalculatorScreen(): JSX.Element {
     requestAnimationFrame(() => {
       measureDesignPickerAnchor();
       setDesignPickerOpen(true);
+    });
+  };
+
+  const measureHardwarePickerAnchor = () => {
+    const node = hardwareDropdownAnchorRef.current;
+    if (!node || typeof node.measureInWindow !== "function") return;
+
+    node.measureInWindow((x, y, width, height) => {
+      if (
+        Number.isFinite(x) &&
+        Number.isFinite(y) &&
+        Number.isFinite(width) &&
+        Number.isFinite(height) &&
+        width > 0 &&
+        height > 0
+      ) {
+        setHardwarePickerRect({ x, y, width, height });
+      }
+    });
+  };
+
+  const onToggleHardwarePicker = () => {
+    if (hardwarePickerOpen) {
+      setHardwarePickerOpen(false);
+      return;
+    }
+
+    if (designPickerOpen) {
+      setDesignPickerOpen(false);
+    }
+
+    if (sashOpeningPickerOpen) {
+      setSashOpeningPickerOpen(false);
+    }
+
+    requestAnimationFrame(() => {
+      measureHardwarePickerAnchor();
+      setHardwarePickerOpen(true);
     });
   };
 
@@ -469,6 +614,10 @@ export function CalculatorScreen(): JSX.Element {
 
     if (designPickerOpen) {
       setDesignPickerOpen(false);
+    }
+
+    if (hardwarePickerOpen) {
+      setHardwarePickerOpen(false);
     }
 
     setSashOpeningPickerSashIndex(index);
@@ -523,6 +672,41 @@ export function CalculatorScreen(): JSX.Element {
       cancelAnimationFrame(frame);
     };
   }, [designPickerOpen, screenHeight, screenWidth]);
+
+  useEffect(() => {
+    if (hardwarePickerOpen) {
+      setHardwarePickerMounted(true);
+    }
+
+    hardwarePickerAnimRef.current?.stop();
+    const anim = Animated.timing(hardwarePickerProgress, {
+      toValue: hardwarePickerOpen ? 1 : 0,
+      duration: hardwarePickerOpen ? 180 : 130,
+      easing: hardwarePickerOpen ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
+      useNativeDriver: true
+    });
+
+    hardwarePickerAnimRef.current = anim;
+    anim.start(({ finished }) => {
+      if (finished && !hardwarePickerOpen) {
+        setHardwarePickerMounted(false);
+      }
+    });
+
+    return () => {
+      anim.stop();
+    };
+  }, [hardwarePickerOpen, hardwarePickerProgress]);
+
+  useEffect(() => {
+    if (!hardwarePickerOpen) return;
+    const frame = requestAnimationFrame(() => {
+      measureHardwarePickerAnchor();
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [hardwarePickerOpen, screenHeight, screenWidth]);
 
   useEffect(() => {
     if (sashOpeningPickerOpen) {
@@ -581,8 +765,10 @@ export function CalculatorScreen(): JSX.Element {
       if (decorBars === "on") nextOptions.push("decor_bars");
     }
 
-    const normalizedHardwareKey = typeof hardwareKey === "string" ? hardwareKey.trim().toLowerCase() : "";
-    const normalizedHardwareLabel = typeof hardwareLabel === "string" ? hardwareLabel.trim() : "";
+    const normalizedHardwareKey =
+      hardwareAvailable && typeof hardwareKey === "string" ? hardwareKey.trim().toLowerCase() : "";
+    const normalizedHardwareLabel =
+      hardwareAvailable && typeof hardwareLabel === "string" ? hardwareLabel.trim() : "";
     if (normalizedHardwareKey) nextOptions.push(normalizedHardwareKey);
     const uniqueOptions = Array.from(new Set(nextOptions));
 
@@ -599,9 +785,7 @@ export function CalculatorScreen(): JSX.Element {
     const normalizeWindowSillWidthCm = (value: unknown): number => {
       const n = typeof value === "number" ? value : Number(value);
       const safe = Number.isFinite(n) ? Math.round(n) : 20;
-      const clamped = Math.min(50, Math.max(5, safe));
-      const stepped = Math.round(clamped / 5) * 5;
-      return Math.min(50, Math.max(5, stepped));
+      return Math.min(50, Math.max(5, safe));
     };
 
     const normalizeDripEdgeWidthCm = (value: unknown): 6 | 9 | 11 | 13 => {
@@ -663,6 +847,13 @@ export function CalculatorScreen(): JSX.Element {
       productType === "window" && dripEdge === "on" ? normalizeDripEdgeWidthCm(dripEdgeWidthCm) : undefined;
     const decorBarsColorValue = productType === "window" && decorBars === "on" ? decorBarsColor : undefined;
 
+    const glassOptions: GlassOptionsInput =
+      selectedGlassOption === "energySaving"
+        ? { energySaving: true }
+        : selectedGlassOption === "multiFunctional"
+          ? { multiFunctional: true }
+          : {};
+
     return {
       width: Number(width) / 100,
       height: Number(height) / 100,
@@ -685,13 +876,11 @@ export function CalculatorScreen(): JSX.Element {
       hardwareKey: normalizedHardwareKey || undefined,
       hardwareLabel: normalizedHardwareKey ? (normalizedHardwareLabel || undefined) : undefined,
 
-      profileSeries,
-      profileDepthMm: Number(profileDepthMm),
+      profileModel: selectedProfileModel?.key,
+      profileSeries: (selectedProfileModel?.legacySeries as CalcInput["profileSeries"]) ?? "kbe",
+      profileDepthMm: selectedProfileModel?.legacyDepthMm ?? selectedProfileModel?.depthMm ?? 70,
       glazing,
-      glassOptions: {
-        energySaving: energySaving === "on",
-        multiFunctional: multiFunctional === "on"
-      },
+      glassOptions,
       lamination,
       laminationGroup,
       laminationSide,
@@ -705,6 +894,9 @@ export function CalculatorScreen(): JSX.Element {
               ...(doorFillTop === doorFillBottom ? { fillType: doorFillTop } : {}),
             }
           : undefined,
+      services: {
+        installEnabled: true,
+      },
     };
   }, [
     decorBars,
@@ -713,7 +905,6 @@ export function CalculatorScreen(): JSX.Element {
     doorSubtype,
     dripEdge,
     dripEdgeWidthCm,
-    energySaving,
     doorFillTop,
     doorFillBottom,
     glazing,
@@ -721,16 +912,17 @@ export function CalculatorScreen(): JSX.Element {
     casing,
     designOption,
     hardwareKey,
+    hardwareAvailable,
     hardwareLabel,
     laminationColor,
     mosquitoNet,
-    multiFunctional,
     openingSashes,
     openingType,
     productType,
-    profileDepthMm,
-    profileSeries,
+    profileModel,
     quantity,
+    selectedProfileModel,
+    selectedGlassOption,
     sashCount,
     windowMeetingPairNoMullion,
     windowSashes,
@@ -748,15 +940,101 @@ export function CalculatorScreen(): JSX.Element {
   }, [calcConfigQuery.data, calcInput, currency]);
 
   const draftTotal = Math.max(0, draftCalcDto?.pricing.total ?? 0);
+  const draftBreakdown = draftCalcDto?.pricing.breakdown ?? null;
+
+  const optionDeltaText = useMemo(() => {
+    const calculateTotalForInput = (nextInput: CalcInput): number | null => {
+      try {
+        const result = calculateQuote(nextInput, calcConfigQuery.data ?? {}, currency);
+        if (result.issues.errors.length) return null;
+        const total = Number(result.pricing.total);
+        return Number.isFinite(total) ? Math.max(0, total) : null;
+      } catch {
+        return null;
+      }
+    };
+
+    const formatDelta = (delta: number | null): string | undefined => {
+      if (delta === null || !Number.isFinite(delta) || delta <= 0.5) return undefined;
+      return `+ ${formatMoney(delta, currency)}`;
+    };
+
+    const withOption = (key: string, enabled: boolean, extras: Partial<CalcInput> = {}): CalcInput => {
+      const nextOptions = new Set(calcInput.options ?? []);
+      if (enabled) nextOptions.add(key);
+      else nextOptions.delete(key);
+      return {
+        ...calcInput,
+        ...extras,
+        options: Array.from(nextOptions),
+      };
+    };
+
+    const normalizeWindowSillWidth = (): number => {
+      const value = Number(windowSillWidthCm);
+      const safe = Number.isFinite(value) ? Math.round(value) : 20;
+      return Math.min(50, Math.max(5, safe));
+    };
+
+    const normalizeDripEdgeWidth = (): 6 | 9 | 11 | 13 => {
+      const value = Number(dripEdgeWidthCm);
+      return value === 6 || value === 9 || value === 11 || value === 13 ? value : 9;
+    };
+
+    const optionDelta = (key: string, enabledExtras: Partial<CalcInput> = {}, disabledExtras: Partial<CalcInput> = {}) => {
+      const baseTotal = calculateTotalForInput(withOption(key, false, disabledExtras));
+      const enabledTotal = calculateTotalForInput(withOption(key, true, enabledExtras));
+      if (baseTotal === null || enabledTotal === null) return undefined;
+      return formatDelta(enabledTotal - baseTotal);
+    };
+
+    const glassDelta = (glassOptions: GlassOptionsInput) => {
+      const baseTotal = calculateTotalForInput({ ...calcInput, glassOptions: {} });
+      const enabledTotal = calculateTotalForInput({ ...calcInput, glassOptions });
+      if (baseTotal === null || enabledTotal === null) return undefined;
+      return formatDelta(enabledTotal - baseTotal);
+    };
+
+    return {
+      energySaving: glassDelta({ energySaving: true }),
+      multiFunctional: glassDelta({ multiFunctional: true }),
+      decorBars: optionDelta(
+        "decor_bars",
+        { decorBarsColor },
+        { decorBarsColor: undefined }
+      ),
+      mosquitoNet: optionDelta("mosquito_net"),
+      windowSill: optionDelta(
+        "window_sill",
+        { windowSillWidthCm: normalizeWindowSillWidth() },
+        { windowSillWidthCm: undefined }
+      ),
+      dripEdge: optionDelta(
+        "drip_edge",
+        { dripEdgeWidthCm: normalizeDripEdgeWidth() },
+        { dripEdgeWidthCm: undefined }
+      ),
+      casing: optionDelta("casing"),
+    };
+  }, [calcConfigQuery.data, calcInput, currency, decorBarsColor, dripEdgeWidthCm, windowSillWidthCm]);
+
+  const pricedGlassOptionItems = useMemo(
+    () =>
+      glassOptionItems.map((item) => ({
+        ...item,
+        description:
+          item.value === "energySaving"
+            ? optionDeltaText.energySaving
+            : item.value === "multiFunctional"
+              ? optionDeltaText.multiFunctional
+              : undefined,
+      })),
+    [glassOptionItems, optionDeltaText.energySaving, optionDeltaText.multiFunctional]
+  );
 
   useEffect(() => {
     setHasCalculated(false);
     setCalculatedTotal(null);
-    setCalcLoading(false);
-    if (calcTimerRef.current) {
-      clearTimeout(calcTimerRef.current);
-      calcTimerRef.current = null;
-    }
   }, [calcInput, currency]);
 
   const validateDraftForOrder = (): boolean => {
@@ -808,7 +1086,6 @@ export function CalculatorScreen(): JSX.Element {
 
 
   const onCalculate = () => {
-    if (calcLoading) return;
     if (!validateDraftForOrder()) return;
 
     const nextTotal = draftTotal;
@@ -817,18 +1094,8 @@ export function CalculatorScreen(): JSX.Element {
       return;
     }
 
-    setCalcLoading(true);
-    if (calcTimerRef.current) {
-      clearTimeout(calcTimerRef.current);
-      calcTimerRef.current = null;
-    }
-
-    calcTimerRef.current = setTimeout(() => {
-      calcTimerRef.current = null;
-      setCalculatedTotal(nextTotal);
-      setHasCalculated(true);
-      setCalcLoading(false);
-    }, 3000);
+    setCalculatedTotal(nextTotal);
+    setHasCalculated(true);
   };
 
 
@@ -852,7 +1119,7 @@ export function CalculatorScreen(): JSX.Element {
         padded={false}
         style={[
           styles.illustrationCard,
-          { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }
+          { backgroundColor: theme.colors.surface }
         ]}
       >
         <View style={styles.illustrationCardInner}>
@@ -868,7 +1135,6 @@ export function CalculatorScreen(): JSX.Element {
               {
                 height: previewHeight,
                 borderRadius: theme.radius.md,
-                borderColor: theme.colors.border,
                 backgroundColor: theme.colors.surface
               }
             ]}
@@ -962,11 +1228,22 @@ export function CalculatorScreen(): JSX.Element {
       ? `${t("calculator.types.door")} · ${t(`calculator.doorSubtypes.${doorSubtype}`)}`
       : t("calculator.types.window");
 
-    const profileValue = `${t(`calculator.profileSeriesOptions.${profileSeries}`)} ${profileDepthMm}`;
+  const profileDepthPreviewKey =
+    (selectedProfileModel?.depthMm ?? 70) <= 60 ? "60" : (selectedProfileModel?.depthMm ?? 70) >= 80 ? "85" : "70";
+  const profileValue = selectedProfileModel
+    ? selectedProfileModel.depthMm && selectedProfileModel.chambers
+      ? `${selectedProfileModel.label} · ${selectedProfileModel.depthMm} мм · ${selectedProfileModel.chambers} камер`
+      : selectedProfileModel.label
+    : t("calculator.preview.none");
+  const profileGroups = profileCatalog.reduce<Record<string, typeof profileCatalog>>((acc, item) => {
+    const key = item.brand || "Profiles";
+    acc[key] = [...(acc[key] ?? []), item];
+    return acc;
+  }, {});
   const glazingValue = t(`calculator.glazingOptions.${glazing}`);
 
   const designValue = t(`calculator.designOptions.${designOption}`, { defaultValue: String(designOption) });
-  const designOptionItems: Array<{ value: DesignOption; label: string }> = [
+  const designOptionItems: SelectListOption<DesignOption>[] = [
     { value: "none", label: t("calculator.designOptions.none") },
     { value: "outside", label: t("calculator.designOptions.outside") },
     { value: "inside", label: t("calculator.designOptions.inside") },
@@ -1007,22 +1284,64 @@ export function CalculatorScreen(): JSX.Element {
     Math.max(designMenuHorizontalMargin, designAnchorX),
     Math.max(designMenuHorizontalMargin, screenWidth - designMenuWidth - designMenuHorizontalMargin)
   );
-  const estimatedDesignMenuHeight = Math.min(
-    320,
-    8 + designOptionItems.length * 46 + Math.max(0, designOptionItems.length - 1) * 4
+  const designMenuTop = Math.max(spacing.sm, designAnchorY + designAnchorMeasuredHeight + spacing.xs);
+  const designMenuMaxHeight = Math.max(0, screenHeight - designMenuTop - spacing.sm);
+  const hardwareOptionItems: SelectListOption<string>[] = hardwareCatalog.map((opt) => {
+    const raw = calcConfigQuery.data?.options?.[opt.key];
+    const price =
+      typeof raw === "number"
+        ? raw
+        : raw && typeof raw === "object"
+          ? Number((raw as any)?.flat ?? 0)
+          : NaN;
+    const description = Number.isFinite(price)
+      ? price > 0
+        ? `+ ${formatMoney(price, currency)}`
+        : formatMoney(price, currency)
+      : undefined;
+    const helperText = [opt.description, description].filter(Boolean).join(" · ") || undefined;
+    return {
+      value: opt.key,
+      label: opt.label,
+      description: helperText,
+    };
+  });
+  const selectedHardwareOption =
+    hardwareOptionItems.find((item) => item.value === hardwareKey) ?? hardwareOptionItems[0] ?? null;
+  const hardwarePickerAnimatedStyle = {
+    opacity: hardwarePickerProgress,
+    transform: [
+      {
+        translateY: hardwarePickerProgress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [-8, 0]
+        })
+      },
+      {
+        scale: hardwarePickerProgress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.98, 1]
+        })
+      }
+    ]
+  };
+  const hardwareMenuBaseWidth = Math.max(220, Math.min(360, screenWidth - spacing.md * 2));
+  const hardwareAnchorX = hardwarePickerRect?.x ?? spacing.md;
+  const hardwareAnchorY = hardwarePickerRect?.y ?? spacing.md;
+  const hardwareAnchorWidth = hardwarePickerRect?.width ?? hardwareMenuBaseWidth;
+  const hardwareAnchorMeasuredHeight = hardwarePickerRect?.height ?? Math.max(46, hardwarePickerAnchorHeight || 46);
+  const hardwareMenuHorizontalMargin = spacing.sm;
+  const hardwareMenuWidth = Math.min(
+    Math.max(hardwareAnchorWidth, 220),
+    Math.max(220, screenWidth - hardwareMenuHorizontalMargin * 2)
   );
-  const designMenuSpaceBelow = screenHeight - (designAnchorY + designAnchorMeasuredHeight) - spacing.sm;
-  const designMenuSpaceAbove = designAnchorY - spacing.sm;
-  const designMenuOpenUpward =
-    designMenuSpaceBelow < Math.min(estimatedDesignMenuHeight, 180) && designMenuSpaceAbove > designMenuSpaceBelow;
-  const designMenuTopDownward = designAnchorY + designAnchorMeasuredHeight + spacing.xs;
-  const designMenuTop = designMenuOpenUpward
-    ? Math.max(spacing.sm, designAnchorY - Math.min(estimatedDesignMenuHeight, Math.max(140, designMenuSpaceAbove)))
-    : Math.max(spacing.sm, Math.min(screenHeight - 120 - spacing.sm, designMenuTopDownward));
-  const designMenuMaxHeight = designMenuOpenUpward
-    ? Math.max(120, designAnchorY - spacing.sm)
-    : Math.max(120, screenHeight - designMenuTop - spacing.sm);
-  const sashOpeningOptionItems: Array<{ value: SashOpening; label: string }> = [
+  const hardwareMenuLeft = Math.min(
+    Math.max(hardwareMenuHorizontalMargin, hardwareAnchorX),
+    Math.max(hardwareMenuHorizontalMargin, screenWidth - hardwareMenuWidth - hardwareMenuHorizontalMargin)
+  );
+  const hardwareMenuTop = Math.max(spacing.sm, hardwareAnchorY + hardwareAnchorMeasuredHeight + spacing.xs);
+  const hardwareMenuMaxHeight = Math.max(0, screenHeight - hardwareMenuTop - spacing.sm);
+  const sashOpeningOptionItems: SelectListOption<SashOpening>[] = [
     { value: "fixed", label: t("calculator.openingTypes.fixed") },
     { value: "turn", label: t("calculator.openingTypes.turn") },
     { value: "tiltTurn", label: t("calculator.openingTypes.tiltTurn") }
@@ -1060,22 +1379,8 @@ export function CalculatorScreen(): JSX.Element {
     Math.max(sashOpeningMenuHorizontalMargin, sashOpeningAnchorX),
     Math.max(sashOpeningMenuHorizontalMargin, screenWidth - sashOpeningMenuWidth - sashOpeningMenuHorizontalMargin)
   );
-  const estimatedSashOpeningMenuHeight = Math.min(
-    320,
-    8 + sashOpeningOptionItems.length * 46 + Math.max(0, sashOpeningOptionItems.length - 1) * 4
-  );
-  const sashOpeningMenuSpaceBelow = screenHeight - (sashOpeningAnchorY + sashOpeningAnchorHeight) - spacing.sm;
-  const sashOpeningMenuSpaceAbove = sashOpeningAnchorY - spacing.sm;
-  const sashOpeningMenuOpenUpward =
-    sashOpeningMenuSpaceBelow < Math.min(estimatedSashOpeningMenuHeight, 180) &&
-    sashOpeningMenuSpaceAbove > sashOpeningMenuSpaceBelow;
-  const sashOpeningMenuTopDownward = sashOpeningAnchorY + sashOpeningAnchorHeight + spacing.xs;
-  const sashOpeningMenuTop = sashOpeningMenuOpenUpward
-    ? Math.max(spacing.sm, sashOpeningAnchorY - Math.min(estimatedSashOpeningMenuHeight, Math.max(140, sashOpeningMenuSpaceAbove)))
-    : Math.max(spacing.sm, Math.min(screenHeight - 120 - spacing.sm, sashOpeningMenuTopDownward));
-  const sashOpeningMenuMaxHeight = sashOpeningMenuOpenUpward
-    ? Math.max(120, sashOpeningAnchorY - spacing.sm)
-    : Math.max(120, screenHeight - sashOpeningMenuTop - spacing.sm);
+  const sashOpeningMenuTop = Math.max(spacing.sm, sashOpeningAnchorY + sashOpeningAnchorHeight + spacing.xs);
+  const sashOpeningMenuMaxHeight = Math.max(0, screenHeight - sashOpeningMenuTop - spacing.sm);
   const laminationColorLabel =
     laminationColor === "gold_oak"
       ? t("calculator.laminationColorOptions.goldOak")
@@ -1107,9 +1412,9 @@ export function CalculatorScreen(): JSX.Element {
   ];
 
   const activeOptionItems: string[] = [];
-  if (energySaving === "on") activeOptionItems.push(t("calculator.energySaving"));
-  if (multiFunctional === "on") activeOptionItems.push(t("calculator.multiFunctional"));
-  if (hardwareLabel && hardwareKey) activeOptionItems.push(`${t("calculator.hardware")}: ${hardwareLabel}`);
+  if (selectedGlassOption === "energySaving") activeOptionItems.push(t("calculator.energySaving"));
+  if (selectedGlassOption === "multiFunctional") activeOptionItems.push(t("calculator.multiFunctional"));
+  if (hardwareAvailable && hardwareLabel && hardwareKey) activeOptionItems.push(`${t("calculator.hardware")}: ${hardwareLabel}`);
   if (designOption !== "none") {
     activeOptionItems.push(`${t("calculator.sectionDesign")}: ${designSummaryValue}`);
   }
@@ -1126,7 +1431,10 @@ export function CalculatorScreen(): JSX.Element {
     }
     if (casing === "on") activeOptionItems.push(t("calculator.extras.casing"));
     if (decorBars === "on") {
-      const key = calcInput.decorBarsColor === "gold" || calcInput.decorBarsColor === "white" ? calcInput.decorBarsColor : null;
+      const key =
+        calcInput.decorBarsColor === "gold" || calcInput.decorBarsColor === "white" || calcInput.decorBarsColor === "brown"
+          ? calcInput.decorBarsColor
+          : null;
       const label = key ? t(`common.colors.${key}`) : "";
       activeOptionItems.push(label ? `${t("calculator.extras.decorBars")} (${label})` : t("calculator.extras.decorBars"));
     }
@@ -1201,32 +1509,40 @@ export function CalculatorScreen(): JSX.Element {
       : []),
   ];
 
+  const resolvedActiveEditorKey = editorSections.some((section) => section.key === activeEditorKey)
+    ? activeEditorKey
+    : (editorSections[0]?.key ?? "construction");
+
+  useEffect(() => {
+    if (resolvedActiveEditorKey !== activeEditorKey) {
+      setActiveEditorKey(resolvedActiveEditorKey);
+    }
+  }, [activeEditorKey, resolvedActiveEditorKey]);
+
   const renderEditorBody = (editorKey: EditorKey) => {
     switch (editorKey) {
       case "dimensions":
         return (
           <View style={styles.grid}>
-            <StepperField
+            <RangeField
               label={t("calculator.width")}
               labelRightSlot={<HelpIcon onPress={() => setHelpKey("width")} accessibilityLabel={t("calculator.width")} />}
               value={width}
               onChangeText={setWidth}
               min={40}
               max={300}
-              step={5}
+              step={1}
               unit="cm"
-              allowDirectEdit
             />
-            <StepperField
+            <RangeField
               label={t("calculator.height")}
               labelRightSlot={<HelpIcon onPress={() => setHelpKey("height")} accessibilityLabel={t("calculator.height")} />}
               value={height}
               onChangeText={setHeight}
               min={40}
               max={300}
-              step={5}
+              step={1}
               unit="cm"
-              allowDirectEdit
             />
             <StepperField
               label={t("calculator.quantity")}
@@ -1349,7 +1665,7 @@ export function CalculatorScreen(): JSX.Element {
 
                         {isExpanded ? (
                           <>
-                            <StepperField
+                            <RangeField
                               label={t("calculator.sashWidth")}
                               value={sash.widthCm}
                               onChangeText={(next) =>
@@ -1363,9 +1679,8 @@ export function CalculatorScreen(): JSX.Element {
                               }
                               min={10}
                               max={Math.max(10, Math.round(Number(width) || 300))}
-                              step={5}
+                              step={1}
                               unit="cm"
-                              allowDirectEdit
                             />
 
                             <View style={styles.field}>
@@ -1382,7 +1697,9 @@ export function CalculatorScreen(): JSX.Element {
                                 }}
                               >
                                 <PickerField
+                                  variant="select"
                                   label={t("calculator.sashOpening")}
+                                  active={sashOpeningPickerOpen && sashOpeningPickerSashIndex === idx}
                                   value={
                                     sash.opening === "turn"
                                       ? t("calculator.openingTypes.turn")
@@ -1457,52 +1774,39 @@ export function CalculatorScreen(): JSX.Element {
               </View>
             ) : null}
 
-            {hardwareCatalog.length ? (
+            {hardwareCatalog.length && hardwareAvailable ? (
               <View style={styles.field}>
-                <Text style={[styles.subSectionTitle, { color: theme.colors.text }]}>{t("calculator.hardware")}</Text>
-                <View style={styles.hardwareGrid}>
-                  {hardwareCatalog.map((opt) => {
-                    const selected = opt.key === hardwareKey;
-                    const raw = calcConfigQuery.data?.options?.[opt.key];
-                    const price =
-                      typeof raw === "number"
-                        ? raw
-                        : raw && typeof raw === "object"
-                          ? Number((raw as any)?.flat ?? 0)
-                          : 0;
-                    const showPrice = Number.isFinite(price);
-
-                    return (
-                      <Pressable
-                        key={`hw-${opt.key}`}
-                        accessibilityRole="button"
-                        onPress={() => {
-                          setHardwareKey(opt.key);
-                          setHardwareLabel(opt.label);
-                        }}
-                        style={(state) => [
-                          styles.hardwareCard,
-                          {
-                            borderColor: selected ? theme.colors.primary : theme.colors.border,
-                            backgroundColor: selected ? theme.colors.primarySoft : theme.colors.surface
-                          },
-                          state.pressed ? styles.hardwareCardPressed : null
-                        ]}
-                      >
-                        <Text
-                          style={[styles.hardwareCardTitle, { color: selected ? theme.colors.primary : theme.colors.text }]}
-                          numberOfLines={2}
-                        >
-                          {opt.label}
-                        </Text>
-                        {showPrice ? (
-                          <Text style={[styles.hardwareCardPrice, { color: theme.colors.textMuted }]} numberOfLines={1}>
-                            {price > 0 ? `+ ${formatMoney(price, currency)}` : formatMoney(price, currency)}
-                          </Text>
-                        ) : null}
-                      </Pressable>
-                    );
-                  })}
+                <View
+                  ref={hardwareDropdownAnchorRef}
+                  style={styles.designDropdownAnchor}
+                  onLayout={(event) => {
+                    const next = Math.round(event.nativeEvent.layout.height);
+                    if (next > 0 && next !== hardwarePickerAnchorHeight) {
+                      setHardwarePickerAnchorHeight(next);
+                    }
+                    if (hardwarePickerOpen) {
+                      requestAnimationFrame(() => {
+                        measureHardwarePickerAnchor();
+                      });
+                    }
+                  }}
+                >
+                  <PickerField
+                    variant="select"
+                    label={t("calculator.hardware")}
+                    active={hardwarePickerOpen}
+                    leftSlot={<Ionicons name="build-outline" size={ICON_SIZE.md} color={theme.colors.primary} />}
+                    rightSlot={
+                      <Ionicons
+                        name={hardwarePickerOpen ? "chevron-up" : "chevron-down"}
+                        size={18}
+                        color={theme.colors.textMuted}
+                      />
+                    }
+                    value={selectedHardwareOption?.label}
+                    helperText={selectedHardwareOption?.description}
+                    onPress={onToggleHardwarePicker}
+                  />
                 </View>
               </View>
             ) : null}
@@ -1542,40 +1846,71 @@ export function CalculatorScreen(): JSX.Element {
 
       case "profile":
         {
-          const profileIllustrationTitle = `${t("calculator.sectionProfile")}: ${profileDepthMm} мм`;
-          const profileIllustration = profileDepthPreview[profileDepthMm];
+          const profileIllustrationTitle = `${t("calculator.sectionProfile")}: ${selectedProfileModel?.label ?? "-"}`;
+          const profileIllustration =
+            (selectedProfileModel?.key ? profileModelPreview[selectedProfileModel.key] : undefined) ??
+            profileDepthPreview[profileDepthPreviewKey as keyof typeof profileDepthPreview];
 
           return (
             <View style={styles.field}>
-              <View style={[styles.grid, isWide ? styles.gridWide : null]}>
-                <View style={styles.gridItem}>
-                  <FieldLabel text={t("calculator.profileSeries")} helpId="profileSeries" />
-                  <SegmentedControl
-                    value={profileSeries}
-                    onChange={setProfileSeries}
-                    options={[
-                      { value: "bautex", label: t("calculator.profileSeriesOptions.bautex") },
-                      { value: "kbe", label: t("calculator.profileSeriesOptions.kbe") },
-                      { value: "rehau", label: t("calculator.profileSeriesOptions.rehau") }
-                    ]}
-                  />
-                </View>
+              <CalcIllustrationCard title={profileIllustrationTitle} source={profileIllustration} />
 
-                <View style={styles.gridItem}>
-                  <FieldLabel text={t("calculator.profileDepth")} helpId="profileDepth" />
-                  <SegmentedControl
-                    value={profileDepthMm}
-                    onChange={setProfileDepthMm}
-                    options={[
-                      { value: "60", label: "60" },
-                      { value: "70", label: "70" },
-                      { value: "85", label: "85" }
-                    ]}
-                  />
+              <View style={styles.field}>
+                <FieldLabel text={t("calculator.profileModel")} helpId="profileModel" />
+                <View style={styles.profileAccordionList}>
+                  {Object.entries(profileGroups).map(([brand, items]) => (
+                    <CollapsibleSection
+                      key={brand}
+                      title={brand}
+                      density="compact"
+                      expanded={expandedProfileBrand === brand}
+                      onExpandedChange={(next) => setExpandedProfileBrand(next ? brand : null)}
+                    >
+                    <View style={styles.profileModelGrid}>
+                      {items.map((item) => {
+                        const selected = selectedProfileModel?.key === item.key;
+                        const metaParts = [
+                          item.depthMm ? `${item.depthMm} мм` : null,
+                          item.chambers ? `${item.chambers} ${t("calculator.profileChambersShort")}` : null,
+                          item.thermalCoefficient ? `${t("calculator.profileThermalShort")} ${item.thermalCoefficient}` : null,
+                        ].filter(Boolean);
+
+                        return (
+                          <Pressable
+                            key={item.key}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected }}
+                            onPress={() => setProfileModel(item.key)}
+                            style={({ pressed }) => [
+                              styles.profileModelCard,
+                              {
+                                borderColor: selected ? theme.colors.primary : theme.colors.border,
+                                backgroundColor: selected ? theme.colors.primarySoft : theme.colors.surface,
+                              },
+                              pressed ? styles.profileModelCardPressed : null,
+                            ]}
+                          >
+                            <Text style={[styles.profileModelTitle, { color: selected ? theme.colors.primary : theme.colors.text }]}>
+                              {item.label}
+                            </Text>
+                            {metaParts.length ? (
+                              <Text style={[styles.profileModelMeta, { color: theme.colors.textMuted }]}>
+                                {metaParts.join(" · ")}
+                              </Text>
+                            ) : null}
+                            {item.description ? (
+                              <Text style={[styles.profileModelDescription, { color: theme.colors.textMuted }]} numberOfLines={3}>
+                                {item.description}
+                              </Text>
+                            ) : null}
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                    </CollapsibleSection>
+                  ))}
                 </View>
               </View>
-
-              <CalcIllustrationCard title={profileIllustrationTitle} source={profileIllustration} />
             </View>
           );
         }
@@ -1587,6 +1922,8 @@ export function CalculatorScreen(): JSX.Element {
 
           return (
             <View style={styles.field}>
+              <CalcIllustrationCard title={glazingIllustrationTitle} source={glazingIllustration} />
+
               <View style={styles.field}>
                 <FieldLabel text={t("calculator.glazing")} helpId="glazing" />
                 <SegmentedControl
@@ -1599,32 +1936,14 @@ export function CalculatorScreen(): JSX.Element {
                 />
               </View>
 
-              <CalcIllustrationCard title={glazingIllustrationTitle} source={glazingIllustration} />
-
-              <View style={[styles.grid, isWide ? styles.gridWide : null]}>
-                <View style={styles.gridItem}>
-                  <SwitchField
-                    label={t("calculator.energySaving")}
-                    labelRightSlot={
-                      <HelpIcon onPress={() => setHelpKey("energySaving")} accessibilityLabel={t("calculator.energySaving")} />
-                    }
-                    value={energySaving === "on"}
-                    valueText={energySaving === "on" ? t("common.yes") : t("common.no")}
-                    onChange={(next) => setEnergySaving(next ? "on" : "off")}
-                  />
-                </View>
-
-                <View style={styles.gridItem}>
-                  <SwitchField
-                    label={t("calculator.multiFunctional")}
-                    labelRightSlot={
-                      <HelpIcon onPress={() => setHelpKey("multiFunctional")} accessibilityLabel={t("calculator.multiFunctional")} />
-                    }
-                    value={multiFunctional === "on"}
-                    valueText={multiFunctional === "on" ? t("common.yes") : t("common.no")}
-                    onChange={(next) => setMultiFunctional(next ? "on" : "off")}
-                  />
-                </View>
+              <View style={styles.field}>
+                <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>{t("calculator.glassOptionType")}</Text>
+                <SegmentedControl
+                  value={selectedGlassOption}
+                  onChange={setSelectedGlassOption}
+                  labelNumberOfLines={2}
+                  options={pricedGlassOptionItems}
+                />
               </View>
             </View>
           );
@@ -1637,7 +1956,7 @@ export function CalculatorScreen(): JSX.Element {
           const designIllustration = designPreview[designOption];
 
           return (
-            <>
+            <View style={styles.designSection}>
               <View style={styles.field}>
                 <CalcIllustrationCard title={designIllustrationTitle} source={designIllustration} />
 
@@ -1657,8 +1976,10 @@ export function CalculatorScreen(): JSX.Element {
                   }}
                 >
                   <PickerField
+                    variant="select"
                     label={t("calculator.sectionDesign")}
                     labelRightSlot={<HelpIcon onPress={() => setHelpKey("lamination")} accessibilityLabel={t("calculator.sectionDesign")} />}
+                    active={designPickerOpen}
                     leftSlot={<Ionicons name="color-wand-outline" size={ICON_SIZE.md} color={theme.colors.primary} />}
                     rightSlot={
                       <Ionicons
@@ -1748,6 +2069,7 @@ export function CalculatorScreen(): JSX.Element {
                           <HelpIcon onPress={() => setHelpKey("decorBars")} accessibilityLabel={t("calculator.extras.decorBars")} />
                         }
                         value={decorBars === "on"}
+                        valueText={optionDeltaText.decorBars}
                         onChange={(next) => setDecorBars(next ? "on" : "off")}
                       />
                       {decorBars === "on" ? (
@@ -1757,10 +2079,11 @@ export function CalculatorScreen(): JSX.Element {
                           </Text>
                           <SegmentedControl
                             value={decorBarsColor}
-                            onChange={(next) => setDecorBarsColor(next as "white" | "gold")}
+                            onChange={(next) => setDecorBarsColor(next as "white" | "gold" | "brown")}
                             options={[
                               { value: "white" as const, label: t("common.colors.white") },
                               { value: "gold" as const, label: t("common.colors.gold") },
+                              { value: "brown" as const, label: t("common.colors.brown") },
                             ]}
                           />
                         </View>
@@ -1769,7 +2092,7 @@ export function CalculatorScreen(): JSX.Element {
                   </View>
                 </View>
               ) : null}
-            </>
+            </View>
           );
         }
 
@@ -1780,29 +2103,30 @@ export function CalculatorScreen(): JSX.Element {
             <SwitchField
               label={t("calculator.extras.mosquitoNet")}
               value={mosquitoNet === "on"}
+              valueText={optionDeltaText.mosquitoNet}
               onChange={(next) => setMosquitoNet(next ? "on" : "off")}
             />
             <SwitchField
               label={t("calculator.extras.windowSill")}
               value={windowSill === "on"}
+              valueText={optionDeltaText.windowSill}
               onChange={(next) => setWindowSill(next ? "on" : "off")}
             />
             {windowSill === "on" ? (
-              <StepperField
+              <RangeField
                 label={t("calculator.extras.windowSillWidth")}
                 value={windowSillWidthCm}
                 onChangeText={setWindowSillWidthCm}
                 min={5}
                 max={50}
-                step={5}
-                snapStep={5}
+                step={1}
                 unit="cm"
-                allowDirectEdit
               />
             ) : null}
             <SwitchField
               label={t("calculator.extras.dripEdge")}
               value={dripEdge === "on"}
+              valueText={optionDeltaText.dripEdge}
               onChange={(next) => setDripEdge(next ? "on" : "off")}
             />
             {dripEdge === "on" ? (
@@ -1825,6 +2149,7 @@ export function CalculatorScreen(): JSX.Element {
             <SwitchField
               label={t("calculator.extras.casing")}
               value={casing === "on"}
+              valueText={optionDeltaText.casing}
               onChange={(next) => setCasing(next ? "on" : "off")}
             />
           </View>
@@ -1833,11 +2158,25 @@ export function CalculatorScreen(): JSX.Element {
     }
   };
 
+  const editorTabsBlock = (
+    <View style={styles.editorTabsBlock}>
+      <SectionTabs
+        items={editorSections.map((section) => ({ key: section.key, label: section.title, icon: section.icon }))}
+        value={resolvedActiveEditorKey}
+        onValueChange={setActiveEditorKey}
+        desktopSingleRow
+      />
+      <Card variant="solid">
+        {renderEditorBody(resolvedActiveEditorKey)}
+      </Card>
+    </View>
+  );
+
   const desktopStickyTop =
     theme.layout.desktopNavHeight + theme.layout.desktopNavGapTop + theme.layout.desktopNavGapBottom + spacing.sm;
 
   const previewCard = (
-    <Card style={[styles.card, isDesktopWeb ? styles.cardCompact : null]}>
+    <Card variant="solid" style={[styles.card, isDesktopWeb ? styles.cardCompact : null]}>
       <View style={styles.cardTitleRow}>
         <View style={[styles.cardTitleIcon, { backgroundColor: theme.colors.primarySoft }]}>
           <Ionicons name={calculatorSectionIcon.preview} size={ICON_SIZE.md} color={theme.colors.primary} />
@@ -1858,14 +2197,14 @@ export function CalculatorScreen(): JSX.Element {
         doorFillTop={productType === "door" ? doorFillTop : undefined}
         doorFillBottom={productType === "door" ? doorFillBottom : undefined}
         doorHandleSide={productType === "door" ? doorHandleSide : undefined}
-        profileDepthMm={Number(profileDepthMm)}
+        profileDepthMm={selectedProfileModel?.depthMm ?? selectedProfileModel?.legacyDepthMm ?? 70}
         glazing={glazing}
         lamination={lamination}
         laminationGroup={laminationGroup}
         laminationColor={lamination !== "none" ? laminationColor : null}
         decorBars={productType === "window" && decorBars === "on"}
         decorBarsColor={decorBarsColor}
-        glassOptions={{ energySaving: energySaving === "on", multiFunctional: multiFunctional === "on" }}
+        glassOptions={calcInput.glassOptions}
       />
 
       <View style={styles.previewChips}>
@@ -1884,9 +2223,7 @@ export function CalculatorScreen(): JSX.Element {
     <PrimaryButton
       title={t("calculator.calculate")}
       onPress={onCalculate}
-      loading={calcLoading}
       disabled={
-        calcLoading ||
         Boolean(draftCalcDto?.issues.errors.length) ||
         (designOption !== "none" && !laminationColor)
       }
@@ -1899,7 +2236,6 @@ export function CalculatorScreen(): JSX.Element {
       title={t("calculator.addToOrder", { defaultValue: "Добавить изделие" })}
       onPress={onAddToOrder}
       disabled={
-        calcLoading ||
         !hasCalculated ||
         Boolean(draftCalcDto?.issues.errors.length) ||
         (designOption !== "none" && !laminationColor) ||
@@ -1920,6 +2256,7 @@ export function CalculatorScreen(): JSX.Element {
       <Text style={[styles.totalValue, { color: theme.colors.primary }]}> 
         {formatMoney(calculatedTotal ?? draftTotal, currency)}
       </Text>
+      <PriceBreakdownList breakdown={draftBreakdown} currency={currency} style={styles.breakdownList} />
       <Text style={[styles.disclaimer, { color: theme.colors.textMuted }]}>{t("calculator.disclaimer")}</Text>
     </Card>
   );
@@ -1964,25 +2301,7 @@ export function CalculatorScreen(): JSX.Element {
 	                    </View>
 
 	                    <View style={styles.desktopRight}>
-	                      <View style={styles.desktopSections}>
-	                        {editorSections.map((section) => (
-	                          <CollapsibleSection
-	                            key={section.key}
-	                            title={section.title}
-	                            expanded={openEditorKey === section.key}
-	                            onExpandedChange={(next) => setOpenEditorKey(next ? section.key : null)}
-	                            density="compact"
-	                            leftSlot={<Ionicons name={section.icon} size={ICON_SIZE.md} color={theme.colors.primary} />}
-	                            rightSlot={
-	                              <Text style={[styles.accordionSectionValue, { color: theme.colors.textMuted }]} numberOfLines={1}>
-	                                {section.value}
-	                              </Text>
-	                            }
-	                          >
-	                            {renderEditorBody(section.key)}
-	                          </CollapsibleSection>
-	                        ))}
-	                      </View>
+	                      <View style={styles.desktopSections}>{editorTabsBlock}</View>
 	                    </View>
 	                  </View>
 	                </View>
@@ -1990,28 +2309,7 @@ export function CalculatorScreen(): JSX.Element {
                 <>
                   <View style={desktopContent}>{previewCard}</View>
 
-                  <View style={desktopContent}>
-                    <View style={styles.characteristicsGrid}>
-                      {editorSections.map((section) => (
-                        <View key={section.key} style={styles.characteristicsItem}>
-                          <CollapsibleSection
-                            title={section.title}
-                            expanded={openEditorKey === section.key}
-                            onExpandedChange={(next) => setOpenEditorKey(next ? section.key : null)}
-                            density={isDesktopWeb ? "compact" : "default"}
-                            leftSlot={<Ionicons name={section.icon} size={ICON_SIZE.md} color={theme.colors.primary} />}
-                            rightSlot={
-                              <Text style={[styles.accordionSectionValue, { color: theme.colors.textMuted }]} numberOfLines={1}>
-                                {section.value}
-                              </Text>
-                            }
-                          >
-                            {renderEditorBody(section.key)}
-                          </CollapsibleSection>
-                        </View>
-                      ))}
-                    </View>
-                  </View>
+                  <View style={desktopContent}>{editorTabsBlock}</View>
 
 
                   {!hasCalculated ? <View style={desktopContent}>{calculateButton}</View> : null}
@@ -2029,142 +2327,60 @@ export function CalculatorScreen(): JSX.Element {
 	                <SiteFooter gutter={spacing.md} />
 	              </View>
 	        </AppScrollView>
-          <Modal
-            transparent
-            animationType="none"
-            visible={designPickerMounted}
-            onRequestClose={() => setDesignPickerOpen(false)}
-          >
-            <View style={styles.designPickerModalRoot}>
-              <Pressable style={styles.designPickerBackdrop} onPress={() => setDesignPickerOpen(false)} />
-              <Animated.View
-                pointerEvents={designPickerOpen ? "auto" : "none"}
-                style={[
-                  styles.designPickerOverlay,
-                  theme.shadow.md,
-                  designPickerAnimatedStyle,
-                  {
-                    top: designMenuTop,
-                    left: designMenuLeft,
-                    width: designMenuWidth,
-                    maxHeight: designMenuMaxHeight,
-                    borderColor: theme.colors.border,
-                    backgroundColor: theme.colors.surface,
-                  }
-                ]}
-              >
-                <ScrollView
-                  style={styles.designPickerScroll}
-                  contentContainerStyle={styles.designPickerList}
-                  nestedScrollEnabled
-                  keyboardShouldPersistTaps="handled"
-                  showsVerticalScrollIndicator={designOptionItems.length > 5}
-                >
-                  {designOptionItems.map((item) => {
-                    const selected = item.value === designOption;
-                    return (
-                      <Pressable
-                        key={item.value}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected }}
-                        onPress={() => {
-                          setDesignOption(item.value);
-                          setDesignPickerOpen(false);
-                        }}
-                        style={({ pressed }) => [
-                          styles.designPickerOption,
-                          {
-                            borderColor: selected ? theme.colors.primary : theme.colors.border,
-                            backgroundColor: selected ? theme.colors.primarySoft : theme.colors.surface2,
-                          },
-                          pressed ? styles.designPickerOptionPressed : null,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.designPickerOptionLabel,
-                            { color: selected ? theme.colors.primary : theme.colors.text }
-                          ]}
-                        >
-                          {item.label}
-                        </Text>
-                        {selected ? <Ionicons name="checkmark" size={18} color={theme.colors.primary} /> : null}
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-              </Animated.View>
-            </View>
-          </Modal>
-          <Modal
-            transparent
-            animationType="none"
-            visible={sashOpeningPickerMounted}
-            onRequestClose={() => setSashOpeningPickerOpen(false)}
-          >
-            <View style={styles.designPickerModalRoot}>
-              <Pressable style={styles.designPickerBackdrop} onPress={() => setSashOpeningPickerOpen(false)} />
-              <Animated.View
-                pointerEvents={sashOpeningPickerOpen ? "auto" : "none"}
-                style={[
-                  styles.designPickerOverlay,
-                  theme.shadow.md,
-                  sashOpeningPickerAnimatedStyle,
-                  {
-                    top: sashOpeningMenuTop,
-                    left: sashOpeningMenuLeft,
-                    width: sashOpeningMenuWidth,
-                    maxHeight: sashOpeningMenuMaxHeight,
-                    borderColor: theme.colors.border,
-                    backgroundColor: theme.colors.surface,
-                  }
-                ]}
-              >
-                <ScrollView
-                  style={styles.designPickerScroll}
-                  contentContainerStyle={styles.designPickerList}
-                  nestedScrollEnabled
-                  keyboardShouldPersistTaps="handled"
-                  showsVerticalScrollIndicator={false}
-                >
-                  {sashOpeningOptionItems.map((item) => {
-                    const selected = item.value === sashOpeningPickerCurrentValue;
-                    return (
-                      <Pressable
-                        key={item.value}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected }}
-                        onPress={() => {
-                          if (sashOpeningPickerSashIndex !== null) {
-                            applySashOpening(sashOpeningPickerSashIndex, item.value);
-                          }
-                          setSashOpeningPickerOpen(false);
-                        }}
-                        style={({ pressed }) => [
-                          styles.designPickerOption,
-                          {
-                            borderColor: selected ? theme.colors.primary : theme.colors.border,
-                            backgroundColor: selected ? theme.colors.primarySoft : theme.colors.surface2,
-                          },
-                          pressed ? styles.designPickerOptionPressed : null,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.designPickerOptionLabel,
-                            { color: selected ? theme.colors.primary : theme.colors.text }
-                          ]}
-                        >
-                          {item.label}
-                        </Text>
-                        {selected ? <Ionicons name="checkmark" size={18} color={theme.colors.primary} /> : null}
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-              </Animated.View>
-            </View>
-          </Modal>
+          <SelectListModal
+            mounted={designPickerMounted}
+            open={designPickerOpen}
+            onClose={() => setDesignPickerOpen(false)}
+            options={designOptionItems}
+            value={designOption}
+            onSelect={(next) => {
+              setDesignOption(next);
+              setDesignPickerOpen(false);
+            }}
+            top={designMenuTop}
+            left={designMenuLeft}
+            width={designMenuWidth}
+            maxHeight={designMenuMaxHeight}
+            animatedStyle={designPickerAnimatedStyle}
+            showVerticalScrollIndicator={designOptionItems.length > 5}
+          />
+          <SelectListModal
+            mounted={hardwarePickerMounted}
+            open={hardwarePickerOpen}
+            onClose={() => setHardwarePickerOpen(false)}
+            options={hardwareOptionItems}
+            value={selectedHardwareOption?.value ?? null}
+            onSelect={(next) => {
+              const selected = hardwareCatalog.find((item) => item.key === next);
+              setHardwareKey(next);
+              setHardwareLabel(selected?.label ?? null);
+              setHardwarePickerOpen(false);
+            }}
+            top={hardwareMenuTop}
+            left={hardwareMenuLeft}
+            width={hardwareMenuWidth}
+            maxHeight={hardwareMenuMaxHeight}
+            animatedStyle={hardwarePickerAnimatedStyle}
+            showVerticalScrollIndicator={hardwareOptionItems.length > 5}
+          />
+          <SelectListModal
+            mounted={sashOpeningPickerMounted}
+            open={sashOpeningPickerOpen}
+            onClose={() => setSashOpeningPickerOpen(false)}
+            options={sashOpeningOptionItems}
+            value={sashOpeningPickerCurrentValue}
+            onSelect={(next) => {
+              if (sashOpeningPickerSashIndex !== null) {
+                applySashOpening(sashOpeningPickerSashIndex, next);
+              }
+              setSashOpeningPickerOpen(false);
+            }}
+            top={sashOpeningMenuTop}
+            left={sashOpeningMenuLeft}
+            width={sashOpeningMenuWidth}
+            maxHeight={sashOpeningMenuMaxHeight}
+            animatedStyle={sashOpeningPickerAnimatedStyle}
+          />
 	        <HelpModal
 	          open={helpKey !== null}
 	          title={helpTitle}
@@ -2217,6 +2433,12 @@ const styles = StyleSheet.create({
     gap: spacing.sm
   },
   desktopSections: {
+    gap: spacing.sm
+  },
+  editorTabsBlock: {
+    gap: spacing.sm
+  },
+  designSection: {
     gap: spacing.sm
   },
   cardTitleRow: {
@@ -2286,83 +2508,45 @@ const styles = StyleSheet.create({
     fontSize: 12,
     letterSpacing: 0.2
   },
-  hardwareGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.sm
-  },
-  hardwareCard: {
-    flexGrow: 1,
-    flexBasis: 0,
-    minWidth: 160,
-    borderWidth: 1,
-    borderRadius: 14,
-    padding: spacing.md,
-    gap: spacing.xs,
-    ...( { outlineStyle: "none", outlineWidth: 0, WebkitTapHighlightColor: "transparent" } as object ),
-    ...( { cursor: "pointer" } as object )
-  },
-  hardwareCardPressed: {
-    opacity: 0.92
-  },
-  hardwareCardTitle: {
-    ...font(900),
-    fontSize: 13,
-    lineHeight: 18
-  },
-  hardwareCardPrice: {
-    ...font(700),
-    fontSize: 12,
-    lineHeight: 16
-  },
   colorPicker: {
     gap: spacing.sm,
     marginTop: spacing.sm
   },
-  designPickerModalRoot: {
-    flex: 1
-  },
-  designPickerBackdrop: {
-    ...StyleSheet.absoluteFillObject
-  },
   designDropdownAnchor: {
     position: "relative"
   },
-  designPickerOverlay: {
-    position: "absolute",
-    zIndex: 70,
-    elevation: 40,
+  profileAccordionList: {
+    gap: spacing.sm,
+  },
+  profileModelGrid: {
+    flexDirection: "column",
+    gap: spacing.sm,
+  },
+  profileModelCard: {
+    width: "100%",
     borderWidth: 1,
-    borderRadius: 12,
-    padding: 4
-  },
-  designPickerScroll: {
-    maxHeight: 320
-  },
-  designPickerList: {
-    gap: 4
-  },
-  designPickerOption: {
-    minHeight: 40,
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    borderRadius: 8,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
     gap: 6,
     ...( { outlineStyle: "none", outlineWidth: 0, WebkitTapHighlightColor: "transparent" } as object ),
     ...( { cursor: "pointer" } as object )
   },
-  designPickerOptionPressed: {
-    opacity: 0.9
+  profileModelCardPressed: {
+    opacity: 0.94,
   },
-  designPickerOptionLabel: {
+  profileModelTitle: {
     ...font(800),
     fontSize: 13,
+    lineHeight: 17,
+  },
+  profileModelMeta: {
+    fontSize: 12,
     lineHeight: 16,
-    flex: 1
+  },
+  profileModelDescription: {
+    fontSize: 12,
+    lineHeight: 16,
   },
   colorGrid: {
     flexDirection: "row",
@@ -2410,7 +2594,6 @@ const styles = StyleSheet.create({
     fontSize: 12
   },
   illustrationCard: {
-    borderWidth: 1,
     overflow: "hidden"
   },
   illustrationCardInner: {
@@ -2429,7 +2612,6 @@ const styles = StyleSheet.create({
     flex: 1
   },
   illustrationImageWrap: {
-    borderWidth: 1,
     overflow: "hidden"
   },
   illustrationImage: {
@@ -2546,6 +2728,9 @@ const styles = StyleSheet.create({
 	    ...font(800),
 	    fontSize: 24
 	  },
+  breakdownList: {
+    marginTop: spacing.xs,
+  },
   promoNote: {
     fontSize: 12,
     marginTop: 2

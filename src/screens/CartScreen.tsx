@@ -6,11 +6,12 @@ import { useTranslation } from "react-i18next";
 import { AppScrollView } from "../components/AppScrollView";
 import { Card } from "../components/Card";
 import { IconButton } from "../components/IconButton";
+import { PriceBreakdownList } from "../components/PriceBreakdownList";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { TextField } from "../components/TextField";
-import { RootStackParamList, type QuoteOrderItemDraft } from "../navigation/types";
+import { RootStackParamList } from "../navigation/types";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCart } from "../services/cart-context";
@@ -18,7 +19,9 @@ import { applyPromoCode } from "../services/quotes";
 import { useCurrencyControls } from "../services/currency-context";
 import { spacing } from "../theme/tokens";
 import { useTheme } from "../theme/ThemeProvider";
+import { buildQuoteBreakdown } from "../utils/calc-breakdown";
 import { formatMoney } from "../utils/money";
+import { formatOrderItemLabel } from "../utils/order-items";
 
 export function CartScreen(): JSX.Element {
   const { t } = useTranslation();
@@ -35,16 +38,10 @@ export function CartScreen(): JSX.Element {
   const promoMutation = useMutation({ mutationFn: applyPromoCode });
 
   const total = promoPreview ?? itemsSubtotal;
-
-  const renderItemLabel = (item: QuoteOrderItemDraft, index: number): string => {
-    const input = item.calcInput;
-    const kind = input.productType === "door" ? t("calculator.types.door") : t("calculator.types.window");
-    const widthCm = typeof input.width === "number" && Number.isFinite(input.width) ? Math.round(input.width * 100) : null;
-    const heightCm = typeof input.height === "number" && Number.isFinite(input.height) ? Math.round(input.height * 100) : null;
-    const qty = typeof input.quantity === "number" && Number.isFinite(input.quantity) ? Math.max(1, Math.round(input.quantity)) : 1;
-    const sizeLabel = widthCm && heightCm ? `${widthCm}x${heightCm} cm` : "-";
-    return `${index + 1}. ${kind} · ${sizeLabel} · x${qty}`;
-  };
+  const breakdown = useMemo(
+    () => buildQuoteBreakdown(items.map((item) => item.preview?.calcDto), Math.max(0, itemsSubtotal - total)),
+    [items, itemsSubtotal, total]
+  );
 
   const onApplyPromo = async () => {
     if (!promoCode.trim()) return;
@@ -116,7 +113,7 @@ export function CartScreen(): JSX.Element {
           </View>
 
           <View style={desktopContent}>
-            <Card style={styles.card}>
+            <Card variant="solid" style={styles.card}>
               <View style={styles.cardTitleRow}>
                 <View style={styles.cardTitleMain}>
                   <View style={[styles.cardTitleIcon, { backgroundColor: theme.colors.primarySoft }]}>
@@ -134,6 +131,7 @@ export function CartScreen(): JSX.Element {
                     tooltip={t("cart.toCalculator", { defaultValue: "Добавить еще" })}
                     onPress={() => navigation.navigate("Calculator")}
                     tone="soft"
+                    enableTooltip={false}
                   />
                   <IconButton
                     icon="trash-outline"
@@ -142,6 +140,7 @@ export function CartScreen(): JSX.Element {
                     onPress={onClear}
                     tone="soft"
                     disabled={!items.length}
+                    enableTooltip={false}
                   />
                 </View>
               </View>
@@ -157,7 +156,7 @@ export function CartScreen(): JSX.Element {
                     >
                       <View style={styles.orderItemMain}>
                         <Text style={[styles.orderItemTitle, { color: theme.colors.text }]} numberOfLines={2}>
-                          {renderItemLabel(item, index)}
+                          {index + 1}. {formatOrderItemLabel(item, t)}
                         </Text>
                         <View style={styles.orderItemActions}>
                           <Text style={[styles.orderItemPrice, { color: theme.colors.primary }]}>
@@ -174,6 +173,7 @@ export function CartScreen(): JSX.Element {
                             tone="soft"
                             size={34}
                             iconSize={16}
+                            enableTooltip={false}
                           />
                         </View>
                       </View>
@@ -198,7 +198,7 @@ export function CartScreen(): JSX.Element {
           </View>
 
           <View style={desktopContent}>
-            <Card style={styles.card}>
+            <Card variant="solid" style={styles.card}>
               <View style={styles.cardTitleRow}>
                 <View style={styles.cardTitleMain}>
                   <View style={[styles.cardTitleIcon, { backgroundColor: theme.colors.primarySoft }]}>
@@ -233,12 +233,14 @@ export function CartScreen(): JSX.Element {
 
               <View style={[styles.totalWrap, { borderTopColor: theme.colors.border }]}> 
                 <Text style={[styles.totalLabel, { color: theme.colors.textMuted }]}> 
-                  {t("quotes.details.fields.total", { defaultValue: "Итого" })}
+                  {t("calculator.totalLabel")}
                 </Text>
                 <Text style={[styles.totalValue, { color: theme.colors.primary }]}> 
                   {formatMoney(total, currency)}
                 </Text>
               </View>
+              <PriceBreakdownList breakdown={breakdown} currency={currency} style={styles.breakdownList} />
+              <Text style={[styles.disclaimer, { color: theme.colors.textMuted }]}>{t("calculator.disclaimer")}</Text>
 
               {promoPreview !== null ? (
                 <Text style={[styles.promoNote, { color: theme.colors.textMuted }]}>{t("calculator.promoApplied")}</Text>
@@ -373,5 +375,12 @@ const styles = StyleSheet.create({
   },
   promoNote: {
     fontSize: 12,
+  },
+  breakdownList: {
+    marginTop: spacing.xs,
+  },
+  disclaimer: {
+    fontSize: 12,
+    lineHeight: 18,
   },
 });

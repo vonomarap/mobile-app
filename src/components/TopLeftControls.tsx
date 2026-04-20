@@ -128,7 +128,7 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
       backgroundColor: theme.colors.surface,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      borderRadius: 999,
+      borderRadius: 10,
       paddingHorizontal: 12,
       height: 40,
       flexDirection: "row",
@@ -139,7 +139,7 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
       ...(theme.shadow.sm as object)
     },
     pillHovered: {
-      opacity: 0.98
+      backgroundColor: theme.colors.surface2
     },
     pillPressed: {
       opacity: 0.92
@@ -159,12 +159,13 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
       backgroundColor: theme.colors.surface,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      borderRadius: 16,
+      borderRadius: 14,
       overflow: "hidden",
+      padding: 6,
       ...(theme.shadow.md as object)
     },
     menuItem: {
-      minHeight: 48,
+      minHeight: 44,
       paddingHorizontal: spacing.md,
       paddingVertical: 10,
       flexDirection: "row",
@@ -172,6 +173,7 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
       justifyContent: "space-between",
       borderWidth: 1,
       borderColor: "transparent",
+      borderRadius: 10,
       ...( { cursor: "pointer" } as object )
     },
     menuItemLeft: {

@@ -33,7 +33,13 @@ export function TextField({
         <Text style={styles.label}>{label}</Text>
         {labelRightSlot ? <View style={styles.labelRight}>{labelRightSlot}</View> : null}
       </View>
-      <View style={[styles.inputRow, focused ? styles.inputRowFocused : null]}>
+      <View
+        style={[
+          styles.inputRow,
+          focused ? styles.inputRowFocused : null,
+          inputProps.editable === false ? styles.inputRowDisabled : null
+        ]}
+      >
         {leftSlot ? <View style={styles.leftSlot}>{leftSlot}</View> : null}
         <TextInput
           {...inputProps}
@@ -75,26 +81,27 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
       marginTop: 1
     },
     inputRow: {
-      minHeight: 46,
+      minHeight: 48,
       borderWidth: 1,
       borderColor: theme.colors.border,
       borderRadius: radius.sm,
-      backgroundColor: theme.colors.surface2,
+      backgroundColor: theme.colors.surface,
       paddingHorizontal: spacing.sm,
+      paddingVertical: 2,
       flexDirection: "row",
       alignItems: "center",
-      gap: spacing.xs
+      gap: spacing.sm
     },
     inputRowFocused: {
       borderColor: theme.colors.focus
     },
+    inputRowDisabled: {
+      opacity: 0.6
+    },
     leftSlot: {
-      width: 32,
-      height: 32,
-      borderRadius: 10,
+      minWidth: 20,
       alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: theme.colors.surface
+      justifyContent: "center"
     },
     input: {
       flex: 1,

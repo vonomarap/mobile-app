@@ -18,6 +18,7 @@ import { useTheme } from "../theme/ThemeProvider";
 export type SegmentOption<T extends string> = {
   label: string;
   value: T;
+  description?: string;
 };
 
 type LabelBehavior = "wrap" | "marquee";
@@ -67,28 +68,36 @@ export function SegmentedControl<T extends string>({
               return [
                 styles.item,
                 multiline ? styles.itemMultiline : null,
+                opt.description ? styles.itemWithDescription : null,
                 selected ? styles.itemSelected : null,
                 hovered && !selected ? styles.itemHovered : null,
                 pressed ? styles.itemPressed : null,
               ];
             }}
           >
-            {shouldMarquee ? (
-              <MarqueeLabel
-                text={opt.label}
-                pauseMs={marqueePauseMs}
-                speedPxPerSec={marqueeSpeedPxPerSec}
-                minOverflowPx={marqueeMinOverflowPx}
-                textStyle={[styles.label, selected ? styles.labelSelected : null]}
-              />
-            ) : (
-              <Text
-                style={[styles.label, selected ? styles.labelSelected : null]}
-                numberOfLines={isMarquee ? 1 : labelNumberOfLines}
-              >
-                {opt.label}
-              </Text>
-            )}
+            <View style={styles.labelStack}>
+              {shouldMarquee ? (
+                <MarqueeLabel
+                  text={opt.label}
+                  pauseMs={marqueePauseMs}
+                  speedPxPerSec={marqueeSpeedPxPerSec}
+                  minOverflowPx={marqueeMinOverflowPx}
+                  textStyle={[styles.label, selected ? styles.labelSelected : null]}
+                />
+              ) : (
+                <Text
+                  style={[styles.label, selected ? styles.labelSelected : null]}
+                  numberOfLines={isMarquee ? 1 : labelNumberOfLines}
+                >
+                  {opt.label}
+                </Text>
+              )}
+              {opt.description ? (
+                <Text style={[styles.description, selected ? styles.descriptionSelected : null]} numberOfLines={1}>
+                  {opt.description}
+                </Text>
+              ) : null}
+            </View>
           </Pressable>
         );
       })}
@@ -198,7 +207,7 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
       flexDirection: "row",
       borderWidth: 1,
       borderColor: theme.colors.border,
-      borderRadius: radius.md,
+      borderRadius: radius.sm,
       padding: 4,
       backgroundColor: theme.colors.surface2,
       gap: 4
@@ -220,9 +229,14 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
       minHeight: 54,
       paddingVertical: 6
     },
+    itemWithDescription: {
+      minHeight: 58,
+      paddingVertical: 6
+    },
     itemSelected: {
-      backgroundColor: theme.colors.primarySoft,
-      borderColor: theme.colors.primary
+      backgroundColor: theme.colors.surface,
+      borderColor: theme.colors.border,
+      ...(theme.shadow.sm as object)
     },
     itemHovered: {
       backgroundColor: theme.colors.surface
@@ -236,6 +250,20 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
       textAlign: "center"
     },
     labelSelected: {
+      color: theme.colors.text
+    },
+    labelStack: {
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 2,
+      minWidth: 0
+    },
+    description: {
+      ...theme.typography.caption,
+      color: theme.colors.textMuted,
+      textAlign: "center"
+    },
+    descriptionSelected: {
       color: theme.colors.primary
     }
   });

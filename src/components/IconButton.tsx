@@ -11,6 +11,10 @@ type Tone = "default" | "soft" | "primary";
 export function IconButton({
   icon,
   onPress,
+  onHoverIn,
+  onHoverOut,
+  onFocus,
+  onBlur,
   accessibilityLabel,
   disabled,
   selected = false,
@@ -19,10 +23,15 @@ export function IconButton({
   iconSize = 18,
   badgeCount = 0,
   tooltip,
+  enableTooltip = true,
   style,
 }: {
   icon: ComponentProps<typeof Ionicons>["name"];
   onPress: () => void;
+  onHoverIn?: () => void;
+  onHoverOut?: () => void;
+  onFocus?: () => void;
+  onBlur?: () => void;
   accessibilityLabel: string;
   disabled?: boolean;
   selected?: boolean;
@@ -31,22 +40,24 @@ export function IconButton({
   iconSize?: number;
   badgeCount?: number;
   tooltip?: string;
+  enableTooltip?: boolean;
   style?: StyleProp<ViewStyle>;
 }): JSX.Element {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const [showTooltip, setShowTooltip] = useState(false);
+  const [tooltipVisible, setTooltipVisible] = useState(false);
 
   const badgeVisible = badgeCount > 0;
   const badgeLabel = badgeCount > 99 ? "99+" : String(badgeCount);
   const tooltipLabel = tooltip ?? accessibilityLabel;
   const isWeb = Platform.OS === "web";
+  const canShowTooltip = isWeb && enableTooltip && Boolean(tooltipLabel);
 
   const palette = (() => {
     if (tone === "primary") {
       return {
         backgroundColor: theme.colors.primary,
-        borderColor: "transparent",
+        borderColor: theme.colors.primary,
         iconColor: "#FFFFFF",
         hoveredBackgroundColor: theme.colors.primary,
       };
@@ -54,10 +65,10 @@ export function IconButton({
 
     if (tone === "soft" || selected) {
       return {
-        backgroundColor: theme.colors.primarySoft,
-        borderColor: theme.colors.border,
+        backgroundColor: selected ? theme.colors.primarySoft : theme.colors.surface,
+        borderColor: selected ? theme.colors.primary : theme.colors.border,
         iconColor: theme.colors.primary,
-        hoveredBackgroundColor: theme.colors.primarySoft,
+        hoveredBackgroundColor: selected ? theme.colors.primarySoft : theme.colors.surface2,
       };
     }
 
@@ -77,10 +88,22 @@ export function IconButton({
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
         accessibilityState={{ disabled, selected }}
-        onHoverIn={isWeb ? () => setShowTooltip(true) : undefined}
-        onHoverOut={isWeb ? () => setShowTooltip(false) : undefined}
-        onFocus={isWeb ? () => setShowTooltip(true) : undefined}
-        onBlur={isWeb ? () => setShowTooltip(false) : undefined}
+        onHoverIn={() => {
+          if (canShowTooltip) setTooltipVisible(true);
+          onHoverIn?.();
+        }}
+        onHoverOut={() => {
+          if (canShowTooltip) setTooltipVisible(false);
+          onHoverOut?.();
+        }}
+        onFocus={() => {
+          if (canShowTooltip) setTooltipVisible(true);
+          onFocus?.();
+        }}
+        onBlur={() => {
+          if (canShowTooltip) setTooltipVisible(false);
+          onBlur?.();
+        }}
         style={(state) => {
           const hovered = (state as unknown as { hovered?: boolean }).hovered;
           const pressed = state.pressed;
@@ -90,7 +113,7 @@ export function IconButton({
             {
               width: size,
               height: size,
-              borderRadius: size / 2,
+              borderRadius: Math.min(theme.radius.sm, size / 2),
               backgroundColor: hovered && !disabled ? palette.hoveredBackgroundColor : palette.backgroundColor,
               borderColor: palette.borderColor,
             },
@@ -110,7 +133,7 @@ export function IconButton({
         ) : null}
       </Pressable>
 
-      {isWeb && showTooltip && tooltipLabel ? (
+      {canShowTooltip && tooltipVisible && tooltipLabel ? (
         <View pointerEvents="none" style={[styles.tooltipWrap, { bottom: size + spacing.xs }]}>
           <View style={styles.tooltip}>
             <Text style={[styles.tooltipText, { color: theme.colors.text }]} numberOfLines={1}>
@@ -141,7 +164,7 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
       ...( { cursor: "pointer" } as object ),
     },
     hovered: {
-      opacity: 0.98,
+      opacity: 1,
     },
     pressed: {
       opacity: 0.92,
@@ -178,7 +201,7 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
     },
     tooltip: {
       maxWidth: 220,
-      borderRadius: 12,
+      borderRadius: theme.radius.sm,
       paddingHorizontal: 10,
       paddingVertical: 8,
       backgroundColor: theme.colors.surface,

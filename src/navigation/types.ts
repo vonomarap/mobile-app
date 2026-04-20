@@ -1,18 +1,43 @@
 import type { CalcInput, CalcResultDTO } from "../utils/calc";
 
-export type QuoteOrderItemDraft = {
+export const HELP_SECTION_KEYS = ["order", "measurement", "profiles", "installation", "repair", "contact"] as const;
+export type HelpSectionKey = (typeof HELP_SECTION_KEYS)[number];
+
+export type QuoteOrderItemPreview = {
+  subtotal: number;
+  total: number;
+  currency: string;
+  calcDto?: CalcResultDTO;
+};
+
+export type QuoteMoskitkiDraftData = {
+  widthMm: number;
+  heightMm: number;
+  quantity: number;
+  pricePerItem: number;
+  title?: string;
+};
+
+export type QuoteCalcOrderItemDraft = {
+  kind?: "calc";
   localId: string;
   calcInput: CalcInput;
-  preview: {
-    subtotal: number;
-    total: number;
-    currency: string;
-    calcDto?: CalcResultDTO;
-  };
+  preview: QuoteOrderItemPreview;
 };
+
+export type QuoteMoskitkiOrderItemDraft = {
+  kind: "moskitki";
+  localId: string;
+  moskitki: QuoteMoskitkiDraftData;
+  preview: QuoteOrderItemPreview;
+};
+
+export type QuoteOrderItemDraft = QuoteCalcOrderItemDraft | QuoteMoskitkiOrderItemDraft;
 
 export type RootStackParamList = {
   Home: undefined;
+  Faq: { section?: HelpSectionKey } | undefined;
+  Moskitki: undefined;
   Catalog: undefined;
   Gallery: undefined;
   Calculator: { presetProductType?: "window" | "door" } | undefined;

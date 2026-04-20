@@ -2,17 +2,18 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useMemo } from "react";
+import { type ComponentProps, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { AppScrollView } from "../components/AppScrollView";
 import { Card } from "../components/Card";
-import { CollapsibleSection } from "../components/CollapsibleSection";
 import { EmptyState } from "../components/EmptyState";
+import { PriceBreakdownList } from "../components/PriceBreakdownList";
 import { ScreenContainer } from "../components/ScreenContainer";
+import { SectionTabs } from "../components/SectionTabs";
 import { SiteFooter } from "../components/SiteFooter";
 import { RootStackParamList } from "../navigation/types";
 import { useAuth } from "../services/auth-context";
-import { fetchQuoteById, QuoteDetails } from "../services/quotes";
+import { fetchQuoteById, QuoteDetails, QuoteItemDetails } from "../services/quotes";
 import { font } from "../theme/font";
 import { useTheme } from "../theme/ThemeProvider";
 import { spacing } from "../theme/tokens";
@@ -21,6 +22,20 @@ import { useTranslation } from "react-i18next";
 import { ICON_SIZE, calculatorSectionIcon } from "../theme/iconography";
 
 type Route = RouteProp<RootStackParamList, "QuoteDetails">;
+type IoniconName = ComponentProps<typeof Ionicons>["name"];
+type DetailTabKey =
+  | "summary"
+  | "contact"
+  | "address"
+  | "dimensions"
+  | "construction"
+  | "entrance"
+  | "profile"
+  | "glazing"
+  | "design"
+  | "extras"
+  | "services"
+  | "calculation";
 
 type QuoteCalcInput = {
   width?: number;
@@ -31,6 +46,7 @@ type QuoteCalcInput = {
   windowSillWidthCm?: number;
   dripEdgeWidthCm?: number;
 
+  profileModel?: string;
   profileSeries?: string;
   profileDepthMm?: number;
   glazing?: string;
@@ -173,6 +189,29 @@ function getStatusLabel(t: (key: string, opts?: any) => string, code: string): s
   return t(`quotes.statuses.${normalized}`, { defaultValue: normalized });
 }
 
+function isMoskitkiQuoteItem(item: QuoteItemDetails | null | undefined): boolean {
+  return Boolean(item && (item.kind === "moskitki" || item.customItem?.type === "moskitki"));
+}
+
+function formatStoredQuoteItemLabel(item: QuoteItemDetails, t: (key: string, opts?: any) => string): string {
+  if (isMoskitkiQuoteItem(item)) {
+    const title = item.customItem?.title?.trim() || t("moskitki.cart.itemTitle");
+    const widthMm = typeof item.customItem?.widthMm === "number" ? Math.max(0, Math.round(item.customItem.widthMm)) : null;
+    const heightMm = typeof item.customItem?.heightMm === "number" ? Math.max(0, Math.round(item.customItem.heightMm)) : null;
+    const quantity = typeof item.customItem?.quantity === "number" ? Math.max(1, Math.round(item.customItem.quantity)) : 1;
+    const sizeLabel = widthMm && heightMm ? `${widthMm}x${heightMm} мм` : "-";
+    return `${title} · ${sizeLabel} · x${quantity}`;
+  }
+
+  const input = item.calcInput;
+  const kind = input?.productType === "door" ? t("calculator.types.door") : t("calculator.types.window");
+  const widthCm = typeof input?.width === "number" && Number.isFinite(input.width) ? Math.round(input.width * 100) : null;
+  const heightCm = typeof input?.height === "number" && Number.isFinite(input.height) ? Math.round(input.height * 100) : null;
+  const quantity = typeof input?.quantity === "number" && Number.isFinite(input.quantity) ? Math.max(1, Math.round(input.quantity)) : 1;
+  const sizeLabel = widthCm && heightCm ? `${widthCm}x${heightCm} cm` : "-";
+  return `${kind} · ${sizeLabel} · x${quantity}`;
+}
+
 export function QuoteDetailsScreen(): JSX.Element {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
@@ -189,6 +228,7 @@ export function QuoteDetailsScreen(): JSX.Element {
   });
 
   const stylesMemo = useMemo(() => makeStyles(theme), [theme]);
+  const [activeTabKey, setActiveTabKey] = useState<DetailTabKey>("summary");
 
   if (!user) {
     return (
@@ -244,17 +284,20 @@ export function QuoteDetailsScreen(): JSX.Element {
   const quote = data as QuoteDetails;
   const statusCode = String(quote.status || "").trim().toUpperCase();
   const statusLabel = getStatusLabel(t, statusCode);
+  const isPreliminaryQuote = statusCode === "NEW" || statusCode === "IN_REVIEW";
 
   const createdMs = toMillis((quote as any).createdAt);
   const createdLabel = createdMs ? new Date(createdMs).toLocaleString(lang === "ru" ? "ru-RU" : "en-US") : "-";
 
   const total = typeof quote.totalPrice === "number" ? quote.totalPrice : quote.calcResult?.total ?? 0;
   const currency = quote.currency ?? quote.calcResult?.currency ?? "RUB";
+  const quoteItems = Array.isArray(quote.items) ? quote.items : [];
+  const isMoskitkiOnly = quoteItems.length > 0 && quoteItems.every((item) => isMoskitkiQuoteItem(item)) && !quote.calcInput;
   const itemsCount =
     typeof quote.itemsCount === "number" && Number.isFinite(quote.itemsCount)
       ? Math.max(1, Math.round(quote.itemsCount))
-      : Array.isArray(quote.items) && quote.items.length
-        ? quote.items.length
+      : quoteItems.length
+        ? quoteItems.length
         : 1;
   const itemsSubtotal =
     typeof quote.itemsSubtotal === "number" && Number.isFinite(quote.itemsSubtotal)
@@ -263,6 +306,7 @@ export function QuoteDetailsScreen(): JSX.Element {
 
   const calcInput = (quote.calcInput ?? {}) as QuoteCalcInput;
   const calcDto = quote.calcResult?.calcDto;
+  const breakdown = quote.calcResult?.breakdown ?? calcDto?.pricing.breakdown ?? null;
   const widthCm = typeof calcInput.width === "number" ? Math.round(calcInput.width * 100) : null;
   const heightCm = typeof calcInput.height === "number" ? Math.round(calcInput.height * 100) : null;
 
@@ -377,7 +421,10 @@ export function QuoteDetailsScreen(): JSX.Element {
   const yes = t("common.yes");
   const no = t("common.no");
   const decorBarsColorRaw = typeof calcInput.decorBarsColor === "string" ? calcInput.decorBarsColor.trim().toLowerCase() : "";
-  const decorBarsColorKey = decorBarsColorRaw === "gold" || decorBarsColorRaw === "white" ? decorBarsColorRaw : null;
+  const decorBarsColorKey =
+    decorBarsColorRaw === "gold" || decorBarsColorRaw === "white" || decorBarsColorRaw === "brown"
+      ? decorBarsColorRaw
+      : null;
   const decorBarsColorLabel = decorBarsColorKey ? t(`common.colors.${decorBarsColorKey}`) : "";
   const decorBarsValueLabel = hasDecorBars ? (decorBarsColorLabel ? `${yes} (${decorBarsColorLabel})` : yes) : no;
 
@@ -386,32 +433,37 @@ export function QuoteDetailsScreen(): JSX.Element {
   const deliveryEnabled = Boolean(calcInput.services?.deliveryEnabled);
   const deliveryKm = typeof calcInput.services?.deliveryKm === "number" ? calcInput.services.deliveryKm : 0;
 
-  return (
-    <ScreenContainer>
-      <AppScrollView trackNavGlass contentContainerStyle={stylesMemo.container} keyboardShouldPersistTaps="handled">
-        <View style={stylesMemo.topBar}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => navigation.goBack()}
-            style={(state) => [stylesMemo.backPill, state.pressed ? stylesMemo.backPillPressed : null]}
-          >
-            <Ionicons name="chevron-back" size={18} color={theme.colors.text} />
-            <Text style={stylesMemo.backText}>{t("common.back")}</Text>
-          </Pressable>
-        </View>
+  const detailTabs: Array<{ key: DetailTabKey; label: string; icon: IoniconName }> = isMoskitkiOnly
+    ? [
+        { key: "summary", label: t("quotes.details.summary"), icon: "receipt-outline" },
+        { key: "contact", label: t("calculator.sectionContact"), icon: calculatorSectionIcon.contact },
+        { key: "address", label: t("calculator.sectionAddress"), icon: calculatorSectionIcon.address },
+        { key: "dimensions", label: t("calculator.sectionDimensions"), icon: calculatorSectionIcon.dimensions },
+        { key: "calculation", label: t("quotes.details.calculation"), icon: "calculator-outline" },
+      ]
+    : [
+        { key: "summary", label: t("quotes.details.summary"), icon: "receipt-outline" },
+        { key: "contact", label: t("calculator.sectionContact"), icon: calculatorSectionIcon.contact },
+        { key: "address", label: t("calculator.sectionAddress"), icon: calculatorSectionIcon.address },
+        { key: "dimensions", label: t("calculator.sectionDimensions"), icon: calculatorSectionIcon.dimensions },
+        { key: "construction", label: t("calculator.sectionConstruction"), icon: calculatorSectionIcon.construction },
+        ...(hasEntranceOptions
+          ? [{ key: "entrance" as const, label: t("calculator.sectionEntrance"), icon: calculatorSectionIcon.entrance }]
+          : []),
+        { key: "profile", label: t("calculator.sectionProfile"), icon: calculatorSectionIcon.profile },
+        { key: "glazing", label: t("calculator.sectionGlazing"), icon: calculatorSectionIcon.glazing },
+        { key: "design", label: t("calculator.sectionDesign"), icon: calculatorSectionIcon.design },
+        { key: "extras", label: t("calculator.sectionExtras"), icon: calculatorSectionIcon.extras },
+        { key: "services", label: t("calculator.sectionServices"), icon: calculatorSectionIcon.services },
+        { key: "calculation", label: t("quotes.details.calculation"), icon: "calculator-outline" },
+      ];
 
-        <View style={stylesMemo.headerWrap}>
-          <Text style={stylesMemo.title}>{t("quotes.details.title")}</Text>
-          <Text style={stylesMemo.subtitle} numberOfLines={1}>
-            #{quoteId}
-          </Text>
-        </View>
+  const resolvedActiveTabKey = detailTabs.some((tab) => tab.key === activeTabKey) ? activeTabKey : "summary";
 
-        <CollapsibleSection
-          title={t("quotes.details.summary")}
-          defaultExpanded
-          leftSlot={<Ionicons name="receipt-outline" size={ICON_SIZE.md} color={theme.colors.primary} />}
-        >
+  const renderActiveTabPanel = (tabKey: DetailTabKey): JSX.Element => {
+    switch (tabKey) {
+      case "summary":
+        return (
           <View style={stylesMemo.sectionBody}>
             <FieldRow label={t("quotes.details.fields.status")} value={statusLabel} showDivider />
             <FieldRow
@@ -432,55 +484,72 @@ export function QuoteDetailsScreen(): JSX.Element {
               showDivider
             />
             {quote.promoCode ? (
-              <FieldRow label={t("quotes.details.fields.promoCode")} value={String(quote.promoCode)} mono />
+              <FieldRow label={t("quotes.details.fields.promoCode")} value={String(quote.promoCode)} mono showDivider={quoteItems.length > 0} />
             ) : (
-              <FieldRow label={t("quotes.details.fields.promoCode")} value={"-"} />
+              <FieldRow label={t("quotes.details.fields.promoCode")} value="-" showDivider={quoteItems.length > 0} />
             )}
+            {quoteItems.length ? (
+              <View style={{ marginTop: spacing.sm }}>
+                {quoteItems.map((item, index) => (
+                  <FieldRow
+                    key={item.id ?? `quote-item-${index}`}
+                    label={`${index + 1}.`}
+                    value={formatStoredQuoteItemLabel(item, t)}
+                    showDivider={index < quoteItems.length - 1}
+                  />
+                ))}
+              </View>
+            ) : null}
+            {isPreliminaryQuote ? (
+              <Text style={[stylesMemo.muted, { color: theme.colors.textMuted }]}>{t("quotes.details.preliminaryHint")}</Text>
+            ) : null}
           </View>
-        </CollapsibleSection>
+        );
 
-        <CollapsibleSection
-          title={t("calculator.sectionContact")}
-          defaultExpanded
-          leftSlot={<Ionicons name={calculatorSectionIcon.contact} size={ICON_SIZE.md} color={theme.colors.primary} />}
-        >
+      case "contact":
+        return (
           <View style={stylesMemo.sectionBody}>
             <FieldRow label={t("account.name")} value={quote.contact?.name ? String(quote.contact.name) : "-"} showDivider />
             <FieldRow label={t("account.phone")} value={quote.contact?.phone ? String(quote.contact.phone) : "-"} />
           </View>
-        </CollapsibleSection>
+        );
 
-        <CollapsibleSection
-          title={t("calculator.sectionAddress")}
-          leftSlot={<Ionicons name={calculatorSectionIcon.address} size={ICON_SIZE.md} color={theme.colors.primary} />}
-        >
+      case "address":
+        return (
           <View style={stylesMemo.sectionBody}>
             <FieldRow label={t("calculator.address")} value={quote.address?.trim() ? String(quote.address) : "-"} />
           </View>
-        </CollapsibleSection>
+        );
 
-        <CollapsibleSection
-          title={t("calculator.sectionDimensions")}
-          leftSlot={<Ionicons name={calculatorSectionIcon.dimensions} size={ICON_SIZE.md} color={theme.colors.primary} />}
-        >
+      case "dimensions":
+        if (isMoskitkiOnly) {
+          return (
+            <View style={stylesMemo.sectionBody}>
+              {quoteItems.map((item, index) => (
+                <FieldRow
+                  key={item.id ?? `moskitki-item-${index}`}
+                  label={`${index + 1}. ${item.customItem?.title?.trim() || t("moskitki.cart.itemTitle")}`}
+                  value={formatStoredQuoteItemLabel(item, t)}
+                  showDivider={index < quoteItems.length - 1}
+                />
+              ))}
+            </View>
+          );
+        }
+
+        return (
           <View style={stylesMemo.sectionBody}>
             <FieldRow label={t("calculator.width")} value={widthCm !== null ? `${widthCm} cm` : "-"} showDivider />
-            <FieldRow
-              label={t("calculator.height")}
-              value={heightCm !== null ? `${heightCm} cm` : "-"}
-              showDivider
-            />
+            <FieldRow label={t("calculator.height")} value={heightCm !== null ? `${heightCm} cm` : "-"} showDivider />
             <FieldRow
               label={t("calculator.quantity")}
               value={typeof calcInput.quantity === "number" ? String(calcInput.quantity) : "-"}
             />
           </View>
-        </CollapsibleSection>
+        );
 
-        <CollapsibleSection
-          title={t("calculator.sectionConstruction")}
-          leftSlot={<Ionicons name={calculatorSectionIcon.construction} size={ICON_SIZE.md} color={theme.colors.primary} />}
-        >
+      case "construction":
+        return (
           <View style={stylesMemo.sectionBody}>
             <FieldRow
               label={t("calculator.productType")}
@@ -488,8 +557,8 @@ export function QuoteDetailsScreen(): JSX.Element {
                 calcInput.productType === "door"
                   ? t("calculator.types.door")
                   : calcInput.productType === "window"
-                  ? t("calculator.types.window")
-                  : "-"
+                    ? t("calculator.types.window")
+                    : "-"
               }
               showDivider
             />
@@ -524,24 +593,24 @@ export function QuoteDetailsScreen(): JSX.Element {
               value={derivedOpeningSashes !== null ? String(derivedOpeningSashes) : "-"}
               showDivider
             />
-	            <FieldRow
-	              label={t("calculator.openingType")}
-	              value={derivedOpeningTypeLabel}
-	              showDivider={meetingPairActive || Boolean(hardwareValue) || Boolean(sashes?.length)}
-	            />
+            <FieldRow
+              label={t("calculator.openingType")}
+              value={derivedOpeningTypeLabel}
+              showDivider={meetingPairActive || Boolean(hardwareValue) || Boolean(sashes?.length)}
+            />
 
-	            {meetingPairActive ? (
-	              <FieldRow
-	                label={t("calculator.meetingPairNoMullion")}
-	                value={t("common.yes")}
-	                showDivider={Boolean(hardwareValue) || Boolean(sashes?.length)}
-	              />
-	            ) : null}
+            {meetingPairActive ? (
+              <FieldRow
+                label={t("calculator.meetingPairNoMullion")}
+                value={t("common.yes")}
+                showDivider={Boolean(hardwareValue) || Boolean(sashes?.length)}
+              />
+            ) : null}
 
-	            {hardwareValue ? (
-	              <FieldRow
-	                label={t("calculator.hardware")}
-	                value={hardwareValue}
+            {hardwareValue ? (
+              <FieldRow
+                label={t("calculator.hardware")}
+                value={hardwareValue}
                 showDivider={Boolean(sashes?.length)}
               />
             ) : null}
@@ -572,49 +641,45 @@ export function QuoteDetailsScreen(): JSX.Element {
               </View>
             ) : null}
           </View>
-        </CollapsibleSection>
+        );
 
-        {hasEntranceOptions ? (
-          <CollapsibleSection
-            title={t("calculator.sectionEntrance")}
-            leftSlot={<Ionicons name={calculatorSectionIcon.entrance} size={ICON_SIZE.md} color={theme.colors.primary} />}
-          >
-            <View style={stylesMemo.sectionBody}>
-              <FieldRow
-                label={t("calculator.entrance.fillTop", { defaultValue: t("calculator.entrance.fillType") })}
-                value={
-                  calcInput.entranceOptions?.fillTop || calcInput.entranceOptions?.fillType
-                    ? t(`calculator.entrance.fillTypes.${calcInput.entranceOptions?.fillTop ?? calcInput.entranceOptions?.fillType}`, {
-                        defaultValue: String(calcInput.entranceOptions?.fillTop ?? calcInput.entranceOptions?.fillType),
-                      })
-                    : "-"
-                }
-                showDivider
-              />
-              <FieldRow
-                label={t("calculator.entrance.fillBottom", { defaultValue: t("calculator.entrance.fillType") })}
-                value={
-                  calcInput.entranceOptions?.fillBottom || calcInput.entranceOptions?.fillType
-                    ? t(`calculator.entrance.fillTypes.${calcInput.entranceOptions?.fillBottom ?? calcInput.entranceOptions?.fillType}`, {
-                        defaultValue: String(calcInput.entranceOptions?.fillBottom ?? calcInput.entranceOptions?.fillType),
-                      })
-                    : "-"
-                }
-                showDivider
-              />
-            </View>
-          </CollapsibleSection>
-        ) : null}
+      case "entrance":
+        return (
+          <View style={stylesMemo.sectionBody}>
+            <FieldRow
+              label={t("calculator.entrance.fillTop", { defaultValue: t("calculator.entrance.fillType") })}
+              value={
+                calcInput.entranceOptions?.fillTop || calcInput.entranceOptions?.fillType
+                  ? t(`calculator.entrance.fillTypes.${calcInput.entranceOptions?.fillTop ?? calcInput.entranceOptions?.fillType}`, {
+                      defaultValue: String(calcInput.entranceOptions?.fillTop ?? calcInput.entranceOptions?.fillType),
+                    })
+                  : "-"
+              }
+              showDivider
+            />
+            <FieldRow
+              label={t("calculator.entrance.fillBottom", { defaultValue: t("calculator.entrance.fillType") })}
+              value={
+                calcInput.entranceOptions?.fillBottom || calcInput.entranceOptions?.fillType
+                  ? t(`calculator.entrance.fillTypes.${calcInput.entranceOptions?.fillBottom ?? calcInput.entranceOptions?.fillType}`, {
+                      defaultValue: String(calcInput.entranceOptions?.fillBottom ?? calcInput.entranceOptions?.fillType),
+                    })
+                  : "-"
+              }
+              showDivider
+            />
+          </View>
+        );
 
-        <CollapsibleSection
-          title={t("calculator.sectionProfile")}
-          leftSlot={<Ionicons name={calculatorSectionIcon.profile} size={ICON_SIZE.md} color={theme.colors.primary} />}
-        >
+      case "profile":
+        return (
           <View style={stylesMemo.sectionBody}>
             <FieldRow
               label={t("calculator.profileSeries")}
               value={
-                calcInput.profileSeries
+                calcInput.profileModel
+                  ? t(`calculator.profileModels.${calcInput.profileModel}`, { defaultValue: String(calcInput.profileModel) })
+                  : calcInput.profileSeries
                   ? t(`calculator.profileSeriesOptions.${calcInput.profileSeries}`, { defaultValue: String(calcInput.profileSeries) })
                   : "-"
               }
@@ -629,12 +694,10 @@ export function QuoteDetailsScreen(): JSX.Element {
               }
             />
           </View>
-        </CollapsibleSection>
+        );
 
-        <CollapsibleSection
-          title={t("calculator.sectionGlazing")}
-          leftSlot={<Ionicons name={calculatorSectionIcon.glazing} size={ICON_SIZE.md} color={theme.colors.primary} />}
-        >
+      case "glazing":
+        return (
           <View style={stylesMemo.sectionBody}>
             <FieldRow
               label={t("calculator.glazing")}
@@ -648,12 +711,10 @@ export function QuoteDetailsScreen(): JSX.Element {
             <FieldRow label={t("calculator.energySaving")} value={truthyLabel(calcInput.glassOptions?.energySaving, yes, no)} showDivider />
             <FieldRow label={t("calculator.multiFunctional")} value={truthyLabel(calcInput.glassOptions?.multiFunctional, yes, no)} />
           </View>
-        </CollapsibleSection>
+        );
 
-        <CollapsibleSection
-          title={t("calculator.sectionDesign")}
-          leftSlot={<Ionicons name={calculatorSectionIcon.design} size={ICON_SIZE.md} color={theme.colors.primary} />}
-        >
+      case "design":
+        return (
           <View style={stylesMemo.sectionBody}>
             {(() => {
               const designLabel = (() => {
@@ -705,12 +766,10 @@ export function QuoteDetailsScreen(): JSX.Element {
               </>
             ) : null}
           </View>
-        </CollapsibleSection>
+        );
 
-        <CollapsibleSection
-          title={t("calculator.sectionExtras")}
-          leftSlot={<Ionicons name={calculatorSectionIcon.extras} size={ICON_SIZE.md} color={theme.colors.primary} />}
-        >
+      case "extras":
+        return (
           <View style={stylesMemo.sectionBody}>
             {extraOptionLabels.length ? (
               <View style={stylesMemo.chips}>
@@ -722,28 +781,23 @@ export function QuoteDetailsScreen(): JSX.Element {
               <Text style={[stylesMemo.muted, { color: theme.colors.textMuted }]}>{t("quotes.details.noExtras")}</Text>
             )}
           </View>
-        </CollapsibleSection>
+        );
 
-        <CollapsibleSection
-          title={t("calculator.sectionServices")}
-          leftSlot={<Ionicons name={calculatorSectionIcon.services} size={ICON_SIZE.md} color={theme.colors.primary} />}
-        >
+      case "services":
+        return (
           <View style={stylesMemo.sectionBody}>
             <FieldRow label={t("calculator.install")} value={truthyLabel(installEnabled, yes, no)} showDivider />
             <FieldRow label={t("calculator.delivery")} value={truthyLabel(deliveryEnabled, yes, no)} showDivider />
             <FieldRow label={t("calculator.deliveryKm")} value={deliveryEnabled ? `${deliveryKm}` : "-"} />
             {!hasServices ? (
-              <Text style={[stylesMemo.muted, { color: theme.colors.textMuted }]}>
-                {t("quotes.details.servicesHint")}
-              </Text>
+              <Text style={[stylesMemo.muted, { color: theme.colors.textMuted }]}>{t("quotes.details.servicesHint")}</Text>
             ) : null}
           </View>
-        </CollapsibleSection>
+        );
 
-	        <CollapsibleSection
-	          title={t("quotes.details.calculation")}
-	          leftSlot={<Ionicons name="calculator-outline" size={ICON_SIZE.md} color={theme.colors.primary} />}
-	        >
+      case "calculation":
+      default:
+        return (
           <View style={stylesMemo.sectionBody}>
             <FieldRow
               label={t("quotes.details.fields.subtotal")}
@@ -755,9 +809,64 @@ export function QuoteDetailsScreen(): JSX.Element {
               value={formatMoney(quote.calcResult?.discount ?? 0, currency)}
               showDivider
             />
-            <FieldRow label={t("quotes.details.fields.total")} value={formatMoney(total, currency)} />
-	          </View>
-	        </CollapsibleSection>
+            <FieldRow
+              label={t("quotes.details.fields.total")}
+              value={formatMoney(total, currency)}
+              showDivider={isMoskitkiOnly && quoteItems.length > 0}
+            />
+            {isMoskitkiOnly && quoteItems.length ? (
+              <View style={{ marginTop: spacing.sm }}>
+                {quoteItems.map((item, index) => {
+                  const quantity = typeof item.customItem?.quantity === "number" ? Math.max(1, Math.round(item.customItem.quantity)) : 1;
+                  const pricePerItem = typeof item.customItem?.pricePerItem === "number" ? item.customItem.pricePerItem : 0;
+                  const lineTotal =
+                    typeof item.positionTotal === "number" ? item.positionTotal : Math.round(pricePerItem * quantity * 100) / 100;
+
+                  return (
+                    <FieldRow
+                      key={item.id ?? `moskitki-price-${index}`}
+                      label={`${index + 1}. ${item.customItem?.title?.trim() || t("moskitki.cart.itemTitle")}`}
+                      value={`${formatMoney(pricePerItem, currency)} x ${quantity} = ${formatMoney(lineTotal, currency)}`}
+                      showDivider={index < quoteItems.length - 1}
+                    />
+                  );
+                })}
+              </View>
+            ) : null}
+            <PriceBreakdownList breakdown={breakdown} currency={currency} style={{ marginTop: spacing.sm }} />
+            {isPreliminaryQuote ? (
+              <Text style={[stylesMemo.muted, { color: theme.colors.textMuted }]}>{t("quotes.details.preliminaryHint")}</Text>
+            ) : null}
+          </View>
+        );
+    }
+  };
+
+  return (
+    <ScreenContainer>
+      <AppScrollView trackNavGlass contentContainerStyle={stylesMemo.container} keyboardShouldPersistTaps="handled">
+        <View style={stylesMemo.topBar}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => navigation.goBack()}
+            style={(state) => [stylesMemo.backPill, state.pressed ? stylesMemo.backPillPressed : null]}
+          >
+            <Ionicons name="chevron-back" size={18} color={theme.colors.text} />
+            <Text style={stylesMemo.backText}>{t("common.back")}</Text>
+          </Pressable>
+        </View>
+
+        <View style={stylesMemo.headerWrap}>
+          <Text style={stylesMemo.title}>{t("quotes.details.title")}</Text>
+          <Text style={stylesMemo.subtitle} numberOfLines={1}>
+            #{quoteId}
+          </Text>
+        </View>
+
+        <View style={stylesMemo.tabsBlock}>
+          <SectionTabs items={detailTabs} value={resolvedActiveTabKey} onValueChange={setActiveTabKey} desktopSingleRow />
+          <Card variant="solid">{renderActiveTabPanel(resolvedActiveTabKey)}</Card>
+        </View>
 
           <SiteFooter gutter={spacing.md} />
 	      </AppScrollView>
@@ -844,6 +953,9 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
     headerWrap: {
       gap: 2,
       marginBottom: 2,
+    },
+    tabsBlock: {
+      gap: spacing.sm,
     },
     title: {
       ...theme.typography.h2,

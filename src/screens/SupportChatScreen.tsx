@@ -10,14 +10,17 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { useTranslation } from "react-i18next";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppFlatList } from "../components/AppFlatList";
 import { Card } from "../components/Card";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { TextField } from "../components/TextField";
 import { useAuth } from "../services/auth-context";
+import { useNavGlassControls } from "../services/scroll-context";
 import {
   customerHasUnreadSupport,
   getOrCreateSupportThread,
@@ -49,6 +52,14 @@ export function SupportChatScreen(): JSX.Element {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const { user, loading } = useAuth();
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const { resetScroll } = useNavGlassControls();
+  const isWeb = Platform.OS === "web";
+  const isDesktopWeb = isWeb && width >= theme.layout.desktopNavMinWidth;
+  const desktopNavOffset = isDesktopWeb
+    ? theme.layout.desktopNavHeight + theme.layout.desktopNavGapTop + theme.layout.desktopNavGapBottom + spacing.sm
+    : 0;
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const locale = i18n.language?.toLowerCase().startsWith("ru") ? "ru-RU" : "en-US";
 
@@ -56,6 +67,7 @@ export function SupportChatScreen(): JSX.Element {
   const [pendingThreadId, setPendingThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<SupportMessage[]>([]);
   const [messageText, setMessageText] = useState("");
+  const [composerFocused, setComposerFocused] = useState(false);
   const [guestName, setGuestName] = useState("");
   const [guestPhone, setGuestPhone] = useState("");
   const [guestEmail, setGuestEmail] = useState("");
@@ -87,6 +99,8 @@ export function SupportChatScreen(): JSX.Element {
   const isClosed = activeThread?.status === "CLOSED";
   const sendDisabled = sending || threadBusy || isClosed;
   const messageTrimmed = messageText.trim();
+  const composerPlaceholder = isClosed ? t("support.closedTitle") : t("support.messagePlaceholder");
+  const showComposerPlaceholder = messageText.length === 0 && !composerFocused;
 
   useEffect(() => {
     if (!activeThreadId) {
@@ -112,6 +126,11 @@ export function SupportChatScreen(): JSX.Element {
       setGuestEmail((prev) => prev || activeThread.guestProfile?.email || "");
     }
   }, [activeThread]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    resetScroll();
+  }, [resetScroll]);
 
   const ensureAuthenticatedThread = async () => {
     if (!user || user.isAnonymous) return;
@@ -196,7 +215,15 @@ export function SupportChatScreen(): JSX.Element {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={Platform.OS === "ios" ? 12 : 0}
       >
-        <View style={styles.container}>
+        <View
+          style={[
+            styles.container,
+            {
+              paddingTop: spacing.md + desktopNavOffset,
+              paddingBottom: Math.max(insets.bottom, spacing.sm),
+            },
+          ]}
+        >
           <View style={styles.headerWrap}>
             <ScreenHeader
               title={t("support.title")}
@@ -240,7 +267,7 @@ export function SupportChatScreen(): JSX.Element {
             <View style={[styles.chatBackdrop, { backgroundColor: theme.colors.surface2 }]} />
 
             <AppFlatList
-              trackNavGlass
+              style={styles.messagesList}
               data={messages}
               keyExtractor={(item) => item.id}
               contentContainerStyle={styles.messagesContent}
@@ -333,24 +360,28 @@ export function SupportChatScreen(): JSX.Element {
               ) : null}
 
               <View style={[styles.composerShell, { backgroundColor: theme.colors.surface2, borderColor: theme.colors.border }]}> 
-                <View style={styles.composerLead}>
-                  <View style={[styles.composerLeadIcon, { backgroundColor: theme.colors.surface }]}> 
-                    <Ionicons name="chatbox-ellipses" size={18} color={theme.colors.primary} />
-                  </View>
-                </View>
+                <View style={styles.composerInputWrap}>
+                  <TextInput
+                    value={messageText}
+                    onChangeText={setMessageText}
+                    editable={!sendDisabled}
+                    multiline
+                    onFocus={() => setComposerFocused(true)}
+                    onBlur={() => setComposerFocused(false)}
+                    textAlignVertical="top"
+                    style={[styles.composerInput, { color: theme.colors.text }]}
+                    selectionColor={theme.colors.primary}
+                    accessibilityLabel={t("support.messageLabel")}
+                  />
 
-                <TextInput
-                  value={messageText}
-                  onChangeText={setMessageText}
-                  placeholder={isClosed ? t("support.closedTitle") : t("support.messagePlaceholder")}
-                  placeholderTextColor={theme.colors.textMuted}
-                  editable={!sendDisabled}
-                  multiline
-                  textAlignVertical="top"
-                  style={[styles.composerInput, { color: theme.colors.text }]}
-                  selectionColor={theme.colors.primary}
-                  accessibilityLabel={t("support.messageLabel")}
-                />
+                  {showComposerPlaceholder ? (
+                    <View pointerEvents="none" style={styles.composerPlaceholderWrap}>
+                      <Text style={[styles.composerPlaceholder, { color: theme.colors.textMuted }]}>
+                        {composerPlaceholder}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
 
                 <Pressable
                   accessibilityRole="button"
@@ -392,9 +423,9 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
     },
     container: {
       flex: 1,
-      padding: spacing.md,
+      minHeight: 0,
+      paddingHorizontal: spacing.md,
       gap: spacing.md,
-      paddingBottom: 0,
       width: "100%",
       maxWidth: 960,
       alignSelf: "center",
@@ -441,6 +472,7 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
     },
     chatCard: {
       flex: 1,
+      minHeight: 0,
       overflow: "hidden",
       borderRadius: radius.lg,
       backgroundColor: theme.colors.surface,
@@ -449,9 +481,13 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
       ...StyleSheet.absoluteFillObject,
       opacity: theme.isDark ? 0.42 : 0.7,
     },
+    messagesList: {
+      flex: 1,
+      minHeight: 0,
+    },
     messagesContent: {
       paddingHorizontal: spacing.md,
-      paddingTop: spacing.lg,
+      paddingTop: spacing.md,
       paddingBottom: spacing.lg,
       flexGrow: 1,
       justifyContent: "flex-end",
@@ -577,23 +613,13 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
     },
     composerShell: {
       flexDirection: "row",
-      alignItems: "flex-end",
+      alignItems: "center",
       gap: spacing.sm,
       borderWidth: 1,
-      borderRadius: 26,
+      borderRadius: radius.lg,
       paddingVertical: 8,
-      paddingHorizontal: 8,
+      paddingHorizontal: 10,
       ...theme.shadow.sm,
-    },
-    composerLead: {
-      paddingBottom: 4,
-    },
-    composerLeadIcon: {
-      width: 38,
-      height: 38,
-      borderRadius: 14,
-      alignItems: "center",
-      justifyContent: "center",
     },
     composerInput: {
       flex: 1,
@@ -602,18 +628,39 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
       paddingTop: 10,
       paddingBottom: 10,
       paddingRight: 4,
+      textAlign: "left",
       fontSize: 15,
       lineHeight: 21,
       ...( { outlineStyle: "none", outlineWidth: 0, WebkitTapHighlightColor: "transparent" } as object ),
+    },
+    composerInputWrap: {
+      flex: 1,
+      position: "relative",
+    },
+    composerPlaceholderWrap: {
+      position: "absolute",
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+      justifyContent: "center",
+      alignItems: "flex-start",
+      paddingRight: 4,
+    },
+    composerPlaceholder: {
+      width: "100%",
+      fontSize: 15,
+      lineHeight: 21,
+      textAlign: "left",
     },
     sendButton: {
       width: 48,
       height: 48,
       borderRadius: 999,
       borderWidth: 1,
+      alignSelf: "center",
       alignItems: "center",
       justifyContent: "center",
-      marginBottom: 1,
       ...( { outlineStyle: "none", outlineWidth: 0, WebkitTapHighlightColor: "transparent" } as object ),
     },
     center: {
