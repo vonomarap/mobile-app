@@ -9,3 +9,5 @@ coverage
 *.log
 android
 ios
+.firebase
+tmp-*.png

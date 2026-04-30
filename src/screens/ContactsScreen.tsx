@@ -1,14 +1,14 @@
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
-import { ActivityIndicator, Image, Linking, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { useEffect, useMemo, useRef } from "react";
+import { ActivityIndicator, Animated, Easing, Image, Linking, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { AppScrollView } from "../components/AppScrollView";
 import { Card } from "../components/Card";
 import { MAX_CONTACT_ICON } from "../constants/contactAssets";
 import { EmptyState } from "../components/EmptyState";
 import { ScreenContainer } from "../components/ScreenContainer";
-import { ScreenHeader } from "../components/ScreenHeader";
+import { useReduceMotion } from "../hooks/useReduceMotion";
 import { fetchSiteSettings } from "../services/site-settings";
 import { font } from "../theme/font";
 import { radius, spacing } from "../theme/tokens";
@@ -24,6 +24,14 @@ type ContactAction = {
   value: string;
   renderIcon: (active: boolean) => JSX.Element;
   onPress: () => void;
+};
+
+type ContactActionTileProps = {
+  item: ContactAction;
+  tileWidth: number;
+  styles: ReturnType<typeof makeStyles>;
+  theme: ReturnType<typeof useTheme>;
+  reduceMotion: boolean;
 };
 
 function openExternalUrl(url: string): void {
@@ -46,10 +54,6 @@ function openExternalUrl(url: string): void {
   void Linking.openURL(url).catch(() => undefined);
 }
 
-function isContactButtonActive(state: { pressed: boolean; hovered?: boolean }): boolean {
-  return Boolean(state.pressed || (Platform.OS === "web" && state.hovered));
-}
-
 function getMaxIconStyle(active: boolean, size: number, mutedColor: string): object[] {
   return [
     { width: size, height: size },
@@ -61,9 +65,87 @@ function getMaxIconStyle(active: boolean, size: number, mutedColor: string): obj
   ];
 }
 
+function ContactActionTile({ item, tileWidth, styles, theme, reduceMotion }: ContactActionTileProps): JSX.Element {
+  const progress = useRef(new Animated.Value(0)).current;
+  const hoveredRef = useRef(false);
+  const focusedRef = useRef(false);
+  const pressedRef = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      progress.stopAnimation();
+    };
+  }, [progress]);
+
+  const animateTo = (toValue: 0 | 1) => {
+    progress.stopAnimation();
+    if (reduceMotion) {
+      progress.setValue(toValue);
+      return;
+    }
+    Animated.timing(progress, {
+      toValue,
+      duration: toValue === 1 ? 150 : 120,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false
+    }).start();
+  };
+
+  const syncInteraction = () => {
+    animateTo(hoveredRef.current || focusedRef.current || pressedRef.current ? 1 : 0);
+  };
+
+  const setHovered = (next: boolean) => {
+    hoveredRef.current = next;
+    syncInteraction();
+  };
+
+  const setFocused = (next: boolean) => {
+    focusedRef.current = next;
+    syncInteraction();
+  };
+
+  const setPressed = (next: boolean) => {
+    pressedRef.current = next;
+    syncInteraction();
+  };
+
+  const inactiveIconOpacity = progress.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
+  const activeIconOpacity = progress;
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${item.title}: ${item.value}`}
+      onPress={item.onPress}
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
+      onHoverIn={Platform.OS === "web" ? () => setHovered(true) : undefined}
+      onHoverOut={Platform.OS === "web" ? () => setHovered(false) : undefined}
+      onFocus={Platform.OS === "web" ? () => setFocused(true) : undefined}
+      onBlur={Platform.OS === "web" ? () => setFocused(false) : undefined}
+      style={[styles.buttonPressable, { width: tileWidth }]}
+    >
+      {({ pressed }) => (
+        <Animated.View style={[styles.contactButton, pressed ? styles.rowPressed : null]}>
+          <Animated.View style={styles.contactButtonIcon}>
+            <View style={styles.iconStack}>
+              <Animated.View style={[styles.iconLayer, { opacity: inactiveIconOpacity }]}>{item.renderIcon(false)}</Animated.View>
+              <Animated.View pointerEvents="none" style={[styles.iconLayer, styles.iconLayerActive, { opacity: activeIconOpacity }]}>
+                {item.renderIcon(true)}
+              </Animated.View>
+            </View>
+          </Animated.View>
+        </Animated.View>
+      )}
+    </Pressable>
+  );
+}
+
 export function ContactsScreen(): JSX.Element {
   const { t } = useTranslation();
   const theme = useTheme();
+  const reduceMotion = useReduceMotion();
   const { width } = useWindowDimensions();
   const isWeb = Platform.OS === "web";
   const isDesktopWeb = isWeb && width >= theme.layout.desktopNavMinWidth;
@@ -186,14 +268,6 @@ export function ContactsScreen(): JSX.Element {
   return (
     <ScreenContainer>
       <AppScrollView trackNavGlass showsVerticalScrollIndicator={false} contentContainerStyle={[styles.container, { padding: gutter }]}>
-        <View style={styles.headerWrap}>
-          <ScreenHeader
-            title={t("contacts.title", { defaultValue: t("footer.contactTitle") })}
-            subtitle={t("contacts.subtitle")}
-            align={isDesktopWeb ? "center" : "left"}
-          />
-        </View>
-
         {hasContacts ? (
           <>
             {directContacts.length ? (
@@ -202,41 +276,14 @@ export function ContactsScreen(): JSX.Element {
 
                 <View style={styles.buttonGrid}>
                   {directContacts.map((item) => (
-                    <Pressable
+                    <ContactActionTile
                       key={item.key}
-                      accessibilityRole="button"
-                      accessibilityLabel={`${item.title}: ${item.value}`}
-                      onPress={item.onPress}
-                      style={[styles.buttonPressable, { width: tileWidth }]}
-                    >
-                      {(state) => {
-                        const active = isContactButtonActive(state as { pressed: boolean; hovered?: boolean });
-                        return (
-                          <View
-                            style={[
-                              styles.contactButton,
-                              {
-                                borderColor: active ? theme.colors.primary : theme.colors.border,
-                                backgroundColor: active ? theme.colors.primarySoft : theme.colors.surface2,
-                              },
-                              state.pressed ? styles.rowPressed : null
-                            ]}
-                          >
-                            <View
-                              style={[
-                                styles.contactButtonIcon,
-                                {
-                                  backgroundColor: theme.colors.surface,
-                                  borderColor: active ? theme.colors.primary : theme.colors.border,
-                                },
-                              ]}
-                            >
-                              {item.renderIcon(active)}
-                            </View>
-                          </View>
-                        );
-                      }}
-                    </Pressable>
+                      item={item}
+                      tileWidth={tileWidth}
+                      styles={styles}
+                      theme={theme}
+                      reduceMotion={reduceMotion}
+                    />
                   ))}
                 </View>
               </Card>
@@ -248,41 +295,14 @@ export function ContactsScreen(): JSX.Element {
 
                 <View style={styles.buttonGrid}>
                   {messengerContacts.map((item) => (
-                    <Pressable
+                    <ContactActionTile
                       key={item.key}
-                      accessibilityRole="button"
-                      accessibilityLabel={`${item.title}: ${item.value}`}
-                      onPress={item.onPress}
-                      style={[styles.buttonPressable, { width: tileWidth }]}
-                    >
-                      {(state) => {
-                        const active = isContactButtonActive(state as { pressed: boolean; hovered?: boolean });
-                        return (
-                          <View
-                            style={[
-                              styles.contactButton,
-                              {
-                                borderColor: active ? theme.colors.primary : theme.colors.border,
-                                backgroundColor: active ? theme.colors.primarySoft : theme.colors.surface2,
-                              },
-                              state.pressed ? styles.rowPressed : null
-                            ]}
-                          >
-                            <View
-                              style={[
-                                styles.contactButtonIcon,
-                                {
-                                  backgroundColor: theme.colors.surface,
-                                  borderColor: active ? theme.colors.primary : theme.colors.border,
-                                },
-                              ]}
-                            >
-                              {item.renderIcon(active)}
-                            </View>
-                          </View>
-                        );
-                      }}
-                    </Pressable>
+                      item={item}
+                      tileWidth={tileWidth}
+                      styles={styles}
+                      theme={theme}
+                      reduceMotion={reduceMotion}
+                    />
                   ))}
                 </View>
               </Card>
@@ -316,10 +336,6 @@ function makeStyles(theme: ReturnType<typeof useTheme>, isDesktopWeb: boolean): 
           } as object)
         : null),
     },
-    headerWrap: {
-      ...(isDesktopWeb ? ({ alignItems: "center" } as object) : null),
-      marginBottom: spacing.sm,
-    },
     card: {
       gap: spacing.sm,
     },
@@ -339,6 +355,8 @@ function makeStyles(theme: ReturnType<typeof useTheme>, isDesktopWeb: boolean): 
     },
     contactButton: {
       borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surface2,
       borderRadius: radius.md,
       minHeight: 72,
       alignItems: "center",
@@ -355,7 +373,25 @@ function makeStyles(theme: ReturnType<typeof useTheme>, isDesktopWeb: boolean): 
       alignItems: "center",
       justifyContent: "center",
       borderWidth: 1,
+      backgroundColor: theme.colors.surface,
       borderColor: theme.colors.border,
+    },
+    iconStack: {
+      width: 24,
+      height: 24,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    iconLayer: {
+      width: 24,
+      height: 24,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    iconLayerActive: {
+      position: "absolute",
+      left: 0,
+      top: 0,
     },
     emptyWrap: {
       flexGrow: 1,

@@ -64,7 +64,6 @@ export function TopLeftMenu(): JSX.Element {
   const mobileCartPopoverHeight = Math.max(300, Math.min(520, height - mobilePopoverTop - spacing.md));
 
   const navItems: Array<{ route: RouteName; label: string; icon: ComponentProps<typeof Ionicons>["name"] }> = [
-    { route: "Home", label: t("tabs.home"), icon: "home-outline" },
     { route: "Catalog", label: t("tabs.catalog"), icon: "grid-outline" },
     { route: "Moskitki", label: t("tabs.moskitki"), icon: "apps-outline" },
     { route: "Gallery", label: t("tabs.gallery"), icon: "images-outline" },

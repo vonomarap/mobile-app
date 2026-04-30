@@ -11,7 +11,7 @@ const resources = {
 } as const;
 
 // Fast Refresh can update screens without re-running i18n initialization.
-// Keep resource bundles in sync so new keys don't show up as raw "home.xxx" strings.
+// Keep resource bundles in sync so new keys don't show up as raw translation keys.
 function syncResourceBundles(): void {
   i18next.addResourceBundle("en", "translation", resources.en.translation, true, true);
   i18next.addResourceBundle("ru", "translation", resources.ru.translation, true, true);

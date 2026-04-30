@@ -68,12 +68,13 @@ function insertAfterTitle(html, snippet) {
 
 const BASE_URL = "https://kanokna.web.app";
 const BRAND_NAME = "КанОкна";
-const DEFAULT_TITLE = `Окна и двери на заказ в Каневской | ${BRAND_NAME}`;
+const CATALOG_TITLE = `Каталог окон и дверей | ${BRAND_NAME}`;
+const CATALOG_DESCRIPTION = "Каталог окон, дверей и комплектующих. Выберите товар и рассчитайте стоимость в калькуляторе.";
 const DEFAULT_DESCRIPTION =
-  "Окна и двери на заказ в Каневской и Каневском районе. Замер, изготовление и монтаж. Рассчитайте стоимость в калькуляторе и оставьте заявку.";
+  CATALOG_DESCRIPTION;
 const OG_IMAGE_WIDTH = 1200;
 const OG_IMAGE_HEIGHT = 630;
-const OG_IMAGE_URL_HOME = `${BASE_URL}/og-image-v3.png`;
+const OG_IMAGE_URL_CATALOG = `${BASE_URL}/og-catalog-v3.png`;
 const THEME_COLOR = "#1E3A8A";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -191,16 +192,16 @@ const pages = [
   {
     filename: "index.html",
     canonical: `${BASE_URL}/`,
-    title: DEFAULT_TITLE,
+    title: CATALOG_TITLE,
     description: DEFAULT_DESCRIPTION,
-    ogImageUrl: OG_IMAGE_URL_HOME
+    ogImageUrl: OG_IMAGE_URL_CATALOG
   },
   {
     filename: "catalog.html",
-    canonical: `${BASE_URL}/catalog`,
-    title: `Каталог окон и дверей | ${BRAND_NAME}`,
-    description: "Каталог окон, дверей и комплектующих. Выберите товар и рассчитайте стоимость в калькуляторе.",
-    ogImageUrl: `${BASE_URL}/og-catalog-v3.png`
+    canonical: `${BASE_URL}/`,
+    title: CATALOG_TITLE,
+    description: CATALOG_DESCRIPTION,
+    ogImageUrl: OG_IMAGE_URL_CATALOG
   },
   {
     filename: "gallery.html",

@@ -1,3 +1,4 @@
+import "./src/setup/vector-icon-font-cache-bust";
 import "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
@@ -88,29 +89,27 @@ function AppShell(): JSX.Element {
   const lastRouteRef = useRef<string | null>(null);
 
   const SEO_BASE_URL = "https://kanokna.web.app";
+  const SEO_CATALOG_PAGE_TITLE = `Каталог окон и дверей`;
+  const SEO_CATALOG_DESCRIPTION =
+    "Каталог окон, дверей и комплектующих. Выберите товар и рассчитайте стоимость в калькуляторе.";
   const SEO_OG_IMAGES = {
-    home: `${SEO_BASE_URL}/og-image-v3.png`,
     catalog: `${SEO_BASE_URL}/og-catalog-v3.png`,
     gallery: `${SEO_BASE_URL}/og-gallery-v3.png`,
     calculator: `${SEO_BASE_URL}/og-calculator-v3.png`,
     contacts: `${SEO_BASE_URL}/og-contacts-v3.png`,
     product: `${SEO_BASE_URL}/og-catalog-v3.png`,
   } as const;
-  const SEO_DEFAULT_DESCRIPTION =
-    "Окна и двери на заказ в Каневской и Каневском районе. Замер, изготовление и монтаж. Рассчитайте стоимость в калькуляторе и оставьте заявку.";
+  const SEO_DEFAULT_DESCRIPTION = SEO_CATALOG_DESCRIPTION;
 
   const setWebTitleForRoute = (routeName: string | null) => {
     if (!isWeb) return;
     const doc = (globalThis as any).document as { title?: string } | undefined;
     if (!doc) return;
 
-    let page = "";
+    let page = SEO_CATALOG_PAGE_TITLE;
     switch (routeName) {
-      case "Home":
-        page = `Окна и двери на заказ в Каневской`;
-        break;
       case "Catalog":
-        page = `Каталог окон и дверей`;
+        page = SEO_CATALOG_PAGE_TITLE;
         break;
       case "Gallery":
         page = `Галерея работ`;
@@ -146,7 +145,7 @@ function AppShell(): JSX.Element {
         page = "Товар";
         break;
       default:
-        page = "";
+        page = SEO_CATALOG_PAGE_TITLE;
         break;
     }
 
@@ -195,14 +194,12 @@ function AppShell(): JSX.Element {
           return SEO_OG_IMAGES.contacts;
         case "ProductDetails":
           return SEO_OG_IMAGES.product;
-        case "Home":
         default:
-          return SEO_OG_IMAGES.home;
+          return SEO_OG_IMAGES.catalog;
       }
     })();
 
     const isIndexable =
-      routeName === "Home" ||
       routeName === "Faq" ||
       routeName === "Catalog" ||
       routeName === "Gallery" ||
@@ -212,12 +209,11 @@ function AppShell(): JSX.Element {
 
     const canonical = (() => {
       if (!isIndexable) return `${SEO_BASE_URL}/`;
-      if (routeName === "Home") return `${SEO_BASE_URL}/`;
       if (routeName === "Faq") {
         if (pathname.startsWith("/faq")) return `${SEO_BASE_URL}${pathname}`;
         return `${SEO_BASE_URL}/faq`;
       }
-      if (routeName === "Catalog") return `${SEO_BASE_URL}/catalog`;
+      if (routeName === "Catalog") return `${SEO_BASE_URL}/`;
       if (routeName === "Gallery") return `${SEO_BASE_URL}/gallery`;
       if (routeName === "Contacts") return `${SEO_BASE_URL}/contacts`;
       if (routeName === "ProductDetails") {
@@ -236,8 +232,8 @@ function AppShell(): JSX.Element {
       switch (routeName) {
         case "Catalog":
           return {
-            title: `Каталог окон и дверей | ${brandName}`,
-            description: "Каталог окон, дверей и комплектующих. Выберите товар и рассчитайте стоимость в калькуляторе."
+            title: `${SEO_CATALOG_PAGE_TITLE} | ${brandName}`,
+            description: SEO_CATALOG_DESCRIPTION
           };
         case "Gallery":
           return {
@@ -289,11 +285,10 @@ function AppShell(): JSX.Element {
             title: `Товар | ${brandName}`,
             description: "Карточка товара с описанием, характеристиками и переходом в калькулятор стоимости."
           };
-        case "Home":
         default:
           return {
-            title: `Окна и двери на заказ в Каневской | ${brandName}`,
-            description: SEO_DEFAULT_DESCRIPTION
+            title: `${SEO_CATALOG_PAGE_TITLE} | ${brandName}`,
+            description: SEO_CATALOG_DESCRIPTION
           };
       }
     })();

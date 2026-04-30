@@ -35,7 +35,6 @@ export type QuoteMoskitkiOrderItemDraft = {
 export type QuoteOrderItemDraft = QuoteCalcOrderItemDraft | QuoteMoskitkiOrderItemDraft;
 
 export type RootStackParamList = {
-  Home: undefined;
   Faq: { section?: HelpSectionKey } | undefined;
   Moskitki: undefined;
   Catalog: undefined;

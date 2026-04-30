@@ -17,12 +17,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppFlatList } from "../components/AppFlatList";
 import { Card } from "../components/Card";
 import { ScreenContainer } from "../components/ScreenContainer";
-import { ScreenHeader } from "../components/ScreenHeader";
 import { TextField } from "../components/TextField";
 import { useAuth } from "../services/auth-context";
 import { useNavGlassControls } from "../services/scroll-context";
 import {
-  customerHasUnreadSupport,
   getOrCreateSupportThread,
   markSupportThreadSeenByCustomer,
   pickActiveSupportThread,
@@ -95,7 +93,6 @@ export function SupportChatScreen(): JSX.Element {
   const activeThreadId = activeThread?.id ?? pendingThreadId;
   const isGuestFlow = !user || user.isAnonymous;
   const needsGuestProfile = !activeThread && isGuestFlow;
-  const hasUnread = customerHasUnreadSupport(activeThread);
   const isClosed = activeThread?.status === "CLOSED";
   const sendDisabled = sending || threadBusy || isClosed;
   const messageTrimmed = messageText.trim();
@@ -224,45 +221,6 @@ export function SupportChatScreen(): JSX.Element {
             },
           ]}
         >
-          <View style={styles.headerWrap}>
-            <ScreenHeader
-              title={t("support.title")}
-              subtitle={t("support.subtitle")}
-              rightSlot={
-                activeThread ? (
-                  <View
-                    style={[
-                      styles.statusBadge,
-                      {
-                        backgroundColor: isClosed ? theme.colors.surface2 : theme.colors.primarySoft,
-                        borderColor: isClosed ? theme.colors.border : theme.colors.primary,
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.statusBadgeText, { color: isClosed ? theme.colors.textMuted : theme.colors.primary }]}>
-                      {isClosed ? t("support.statusClosed") : t("support.statusOpen")}
-                    </Text>
-                  </View>
-                ) : undefined
-              }
-            />
-            <View style={styles.headerBadges}>
-              {hasUnread ? (
-                <View style={[styles.headerChip, { backgroundColor: theme.colors.primarySoft }]}> 
-                  <Ionicons name="sparkles" size={14} color={theme.colors.primary} />
-                  <Text style={[styles.headerChipText, { color: theme.colors.primary }]}>{t("support.unread")}</Text>
-                </View>
-              ) : null}
-              {isClosed ? (
-                <View style={[styles.headerChip, { backgroundColor: theme.colors.surface2 }]}> 
-                  <Ionicons name="lock-closed" size={14} color={theme.colors.textMuted} />
-                  <Text style={[styles.headerChipText, { color: theme.colors.textMuted }]}>{t("support.closedTitle")}</Text>
-                </View>
-              ) : null}
-            </View>
-            {isClosed ? <Text style={[styles.closedHint, { color: theme.colors.textMuted }]}>{t("support.closedBody")}</Text> : null}
-          </View>
-
           <Card style={styles.chatCard} padded={false} variant="solid">
             <View style={[styles.chatBackdrop, { backgroundColor: theme.colors.surface2 }]} />
 
@@ -429,46 +387,6 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
       width: "100%",
       maxWidth: 960,
       alignSelf: "center",
-    },
-    headerWrap: {
-      width: "100%",
-      gap: spacing.sm,
-    },
-    headerBadges: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: spacing.xs,
-    },
-    headerChip: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
-      minHeight: 32,
-      paddingHorizontal: spacing.sm,
-      borderRadius: 999,
-      alignSelf: "flex-start",
-    },
-    headerChipText: {
-      ...theme.typography.caption,
-      fontSize: 12,
-    },
-    statusBadge: {
-      minHeight: 34,
-      paddingHorizontal: spacing.sm,
-      borderRadius: 999,
-      borderWidth: 1,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    statusBadgeText: {
-      ...theme.typography.label,
-      fontSize: 12,
-    },
-    closedHint: {
-      ...theme.typography.caption,
-      fontSize: 13,
-      lineHeight: 18,
-      maxWidth: 720,
     },
     chatCard: {
       flex: 1,

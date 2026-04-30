@@ -1,5 +1,4 @@
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import { useMemo, useState } from "react";
 import { LayoutChangeEvent, Platform, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
@@ -234,6 +233,7 @@ export function ProductPreview({
   const mullionWidth = useMemo(() => clampInt(frameThickness * 0.35, 2, 6), [frameThickness]);
   const sashFrameThickness = useMemo(() => clampInt(frameThickness * 0.7, 4, 14), [frameThickness]);
   const gasketWidth = useMemo(() => clampInt(Math.max(1, sashFrameThickness * 0.18), 1, 3), [sashFrameThickness]);
+  const depthPx = useMemo(() => clampInt(frameThickness * 0.55, 3, 12), [frameThickness]);
   const decorBarThickness = useMemo(() => {
     const factor = detailLevel === "high" ? 0.24 : detailLevel === "mid" ? 0.22 : 0.2;
     return clampInt(Math.round(sashFrameThickness * factor), 1, 4);
@@ -367,26 +367,21 @@ export function ProductPreview({
 
   const glassPalette = useMemo(() => {
     // Preview-only: keep glass always blue (ignore energy-saving / multifunctional tint).
-    const colors = theme.isDark
-      ? (["rgba(0,156,255,0.34)", "rgba(138,224,255,0.16)", "rgba(0,18,46,0.58)"] as const)
-      : (["rgba(0,136,255,0.46)", "rgba(170,234,255,0.26)", "rgba(0,48,132,0.22)"] as const);
-
-    const sheen = theme.isDark
-      ? (["rgba(210,245,255,0.26)", "rgba(255,255,255,0.00)"] as const)
-      : (["rgba(240,252,255,0.72)", "rgba(255,255,255,0.00)"] as const);
-
-    const edge = theme.isDark ? "rgba(120,214,255,0.36)" : "rgba(0,112,255,0.22)";
-    return { colors, sheen, edge };
+    const base = theme.isDark ? "#7EB3DA" : "#A9D5F1";
+    const sheen = theme.isDark ? "rgba(198,232,255,0.16)" : "rgba(236,248,255,0.34)";
+    const highlight = theme.isDark ? "rgba(214,238,255,0.18)" : "rgba(245,252,255,0.50)";
+    const edge = theme.isDark ? "rgba(132,210,255,0.48)" : "rgba(43,138,214,0.34)";
+    return { base, sheen, highlight, edge };
   }, [theme.isDark]);
 
-  const canvasBg = theme.isDark
-    ? (["#0F1115", "#17181C", "#0B0C0E"] as const)
-    : (["#F7F7F8", "#EEF0F4", "#FFFFFF"] as const);
+  const canvasBg = theme.isDark ? "#0D0F13" : "#C4CBD4";
 
   const shadowWebStyle =
     Platform.OS === "web"
       ? ({
-          boxShadow: theme.isDark ? "0 22px 70px rgba(0,0,0,0.55)" : "0 18px 54px rgba(15,23,42,0.16)"
+          boxShadow: theme.isDark
+            ? "0 1px 4px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.2)"
+            : "0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(15,23,42,0.06)"
         } as any)
       : null;
 
@@ -396,11 +391,18 @@ export function ProductPreview({
     <View style={styles.root}>
       <View style={styles.topRow}>
         <View style={styles.widthDim}>
-          <Ionicons name="arrow-back" size={14} color={theme.colors.textMuted} />
+          <View
+            style={[
+              styles.dimArrow,
+              styles.dimArrowHorizontal,
+              { backgroundColor: theme.isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }
+            ]}
+          >
+            <Ionicons name="resize-outline" size={10} color={theme.colors.textMuted} />
+          </View>
           <Text style={[styles.dimText, { color: theme.colors.textMuted }]} numberOfLines={1}>
             {hasDims ? widthLabel : "--"}
           </Text>
-          <Ionicons name="arrow-forward" size={14} color={theme.colors.textMuted} />
         </View>
         <View style={styles.heightGutter} />
       </View>
@@ -410,20 +412,12 @@ export function ProductPreview({
           style={[styles.canvas, { height: CANVAS_HEIGHT }]}
           onLayout={onLayout}
         >
-          <LinearGradient colors={canvasBg} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-          <View
-            pointerEvents="none"
-            style={[
-              StyleSheet.absoluteFill,
-              {
-                backgroundColor: theme.isDark ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)",
-                opacity: theme.isDark ? 1 : 0.9
-              }
-            ]}
-          />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: canvasBg }]} />
           {!hasDims ? (
             <View style={styles.placeholder}>
-              <Ionicons name="resize-outline" size={20} color={theme.colors.primary} />
+              <View style={[styles.placeholderIcon, { backgroundColor: theme.isDark ? 'rgba(249,115,22,0.12)' : 'rgba(234,88,12,0.08)' }]}>
+                <Ionicons name="resize-outline" size={22} color={theme.colors.primary} />
+              </View>
               <Text style={[styles.placeholderText, { color: theme.colors.textMuted }]}>
                 {t(kind === "door" ? "calculator.preview.placeholderDoor" : "calculator.preview.placeholderWindow")}
               </Text>
@@ -433,13 +427,13 @@ export function ProductPreview({
               <View
                 style={[
                   styles.productShadow,
-                  theme.shadow.lg,
+                  theme.shadow.md,
                   shadowWebStyle,
-                  { width: productSize.w, height: productSize.h, borderRadius: radius.sm, backgroundColor: theme.colors.surface }
+                  { width: productSize.w, height: productSize.h, borderRadius: radius.md, backgroundColor: theme.colors.surface }
                 ]}
               >
-                <View style={[styles.productClip, { borderRadius: radius.sm }]}>
-                  <View
+                <View style={[styles.productClip, { borderRadius: radius.md }]}>
+                <View
                     style={[
                       styles.frameOuter,
                       {
@@ -449,8 +443,7 @@ export function ProductPreview({
                       }
                     ]}
                   >
-                    <LinearGradient colors={palette.frameOuter} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-                    <LinearGradient colors={palette.frameSheen} start={{ x: 0.05, y: 0.0 }} end={{ x: 0.9, y: 0.9 }} style={styles.frameSheen} />
+                    <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.frameOuter[0] }]} />
 
                     <View style={[styles.frameInner, { padding: frameThickness, borderRadius: Math.max(0, radius.sm - 2) }]}>
                       {showFrameDrainSlots ? (
@@ -491,12 +484,7 @@ export function ProductPreview({
                       ) : null}
 
                       <View style={[styles.frameRecess, { borderRadius: Math.max(0, radius.sm - 6) }]}>
-                      <LinearGradient
-                        colors={palette.recess}
-                        start={{ x: 0.1, y: 0.0 }}
-                        end={{ x: 0.9, y: 1 }}
-                        style={StyleSheet.absoluteFill}
-                      />
+                      <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.recess[0] }]} />
 
                       <View style={styles.sashesRow}>
                         {sashSpecs.map((sash, idx) => {
@@ -541,18 +529,7 @@ export function ProductPreview({
                                     fillStyle
                                   ]}
                                 >
-                                  <LinearGradient
-                                    colors={palette.panelBase}
-                                    start={{ x: 0, y: 0 }}
-                                    end={{ x: 1, y: 1 }}
-                                    style={StyleSheet.absoluteFill}
-                                  />
-                                  <LinearGradient
-                                    colors={palette.panelSheen}
-                                    start={{ x: 0.15, y: 0.0 }}
-                                    end={{ x: 0.85, y: 1 }}
-                                    style={StyleSheet.absoluteFill}
-                                  />
+                                  <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.panelBase[0] }]} />
                                   <View
                                     style={[
                                       styles.panelGroove,
@@ -587,21 +564,10 @@ export function ProductPreview({
                                   fillStyle
                                 ]}
                               >
-                                <LinearGradient
-                                  colors={
-                                    theme.isDark
-                                      ? (["rgba(255,255,255,0.94)", "rgba(245,249,255,0.86)"] as const)
-                                      : (["rgba(255,255,255,0.98)", "rgba(245,249,255,0.92)"] as const)
-                                  }
-                                  start={{ x: 0, y: 0 }}
-                                  end={{ x: 1, y: 1 }}
-                                  style={StyleSheet.absoluteFill}
-                                />
-                                <LinearGradient
-                                  colors={glassPalette.colors}
-                                  start={{ x: 0, y: 0 }}
-                                  end={{ x: 1, y: 1 }}
-                                  style={StyleSheet.absoluteFill}
+                                <View
+                                  style={[StyleSheet.absoluteFill, {
+                                    backgroundColor: glassPalette.base
+                                  }]}
                                 />
                                 {showDecorBars ? (
                                   <View pointerEvents="none" style={styles.decorBars}>
@@ -618,12 +584,7 @@ export function ProductPreview({
                                         },
                                       ]}
                                     >
-                                      <LinearGradient
-                                        colors={decorBarsGradient}
-                                        start={{ x: 0, y: 0 }}
-                                        end={{ x: 1, y: 0 }}
-                                        style={StyleSheet.absoluteFill}
-                                      />
+                                      <View style={[StyleSheet.absoluteFill, { backgroundColor: decorBarsGradient[0] }]} />
                                     </View>
 
                                     <View
@@ -639,12 +600,7 @@ export function ProductPreview({
                                         },
                                       ]}
                                     >
-                                      <LinearGradient
-                                        colors={decorBarsGradient}
-                                        start={{ x: 0, y: 0 }}
-                                        end={{ x: 0, y: 1 }}
-                                        style={StyleSheet.absoluteFill}
-                                      />
+                                      <View style={[StyleSheet.absoluteFill, { backgroundColor: decorBarsGradient[0] }]} />
                                     </View>
 
                                     <View
@@ -660,20 +616,29 @@ export function ProductPreview({
                                         },
                                       ]}
                                     >
-                                      <LinearGradient
-                                        colors={decorBarsGradient}
-                                        start={{ x: 0, y: 0 }}
-                                        end={{ x: 0, y: 1 }}
-                                        style={StyleSheet.absoluteFill}
-                                      />
+                                      <View style={[StyleSheet.absoluteFill, { backgroundColor: decorBarsGradient[0] }]} />
                                     </View>
                                   </View>
                                 ) : null}
-                                <LinearGradient
-                                  colors={glassPalette.sheen}
-                                  start={{ x: 0.05, y: 0.1 }}
-                                  end={{ x: 0.95, y: 0.9 }}
-                                  style={styles.glassSheen}
+                                {/* Clean flat highlight strip */}
+                                <View
+                                  pointerEvents="none"
+                                  style={[
+                                    styles.glassSheen,
+                                    {
+                                      backgroundColor: glassPalette.sheen
+                                    }
+                                  ]}
+                                />
+                                {/* Bright highlight spot (top-left) */}
+                                <View
+                                  pointerEvents="none"
+                                  style={[
+                                    styles.glassHighlight,
+                                    {
+                                      backgroundColor: glassPalette.highlight
+                                    }
+                                  ]}
                                 />
 
                                 <View style={styles.glassEdges}>
@@ -714,12 +679,7 @@ export function ProductPreview({
                             ) : null,
                             <View key={`s-${idx}`} style={[styles.sashWrap, { flexGrow: sash.widthFlex }]}>
                               <View style={[styles.sashFrame, { padding: sashFrameThickness, borderRadius: Math.max(8, radius.sm - 2) }]}>
-                                <LinearGradient
-                                  colors={palette.sashOuter}
-                                  start={{ x: 0, y: 0 }}
-                                  end={{ x: 1, y: 1 }}
-                                  style={StyleSheet.absoluteFill}
-                                />
+                                <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.sashOuter[0] }]} />
 
                                 <View
                                   style={[
@@ -750,12 +710,7 @@ export function ProductPreview({
                                           }
                                         ]}
                                       >
-                                        <LinearGradient
-                                          colors={palette.sashOuter}
-                                          start={{ x: 0, y: 0 }}
-                                          end={{ x: 1, y: 1 }}
-                                          style={StyleSheet.absoluteFill}
-                                        />
+                                        <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.sashOuter[0] }]} />
                                       </View>
                                     </View>
                                   ) : (
@@ -816,19 +771,13 @@ export function ProductPreview({
                                       handleSide === "left" ? { left: handleInset } : { right: handleInset }
                                     ]}
                                   >
-                                    <LinearGradient
-                                      colors={palette.handleMetal}
-                                      start={{ x: 0.2, y: 0 }}
-                                      end={{ x: 0.8, y: 1 }}
+                                    <View
                                       style={[
                                         styles.handlePlate,
-                                        { top: plateTop, width: plateW, height: plateH, borderRadius: Math.max(4, Math.round(plateW * 0.5)) }
+                                        { top: plateTop, width: plateW, height: plateH, borderRadius: Math.max(4, Math.round(plateW * 0.5)), backgroundColor: '#111827' }
                                       ]}
                                     />
-                                    <LinearGradient
-                                      colors={palette.handleMetal}
-                                      start={{ x: 0.2, y: 0 }}
-                                      end={{ x: 0.8, y: 1 }}
+                                    <View
                                       style={[
                                         styles.handleLever,
                                         {
@@ -836,7 +785,8 @@ export function ProductPreview({
                                           left: Math.max(0, plateW - 1),
                                           width: leverW,
                                           height: leverH,
-                                          borderRadius: Math.max(4, Math.round(leverH * 0.5))
+                                          borderRadius: Math.max(4, Math.round(leverH * 0.5)),
+                                          backgroundColor: '#111827'
                                         }
                                       ]}
                                     />
@@ -865,12 +815,12 @@ export function ProductPreview({
                         })}
                       </View>
 
-                      <LinearGradient
+                      <View
                         pointerEvents="none"
-                        colors={theme.isDark ? (["rgba(0,0,0,0.32)", "rgba(0,0,0,0.00)"] as const) : (["rgba(0,0,0,0.14)", "rgba(0,0,0,0.00)"] as const)}
-                        start={{ x: 0.5, y: 1 }}
-                        end={{ x: 0.5, y: 0 }}
-                        style={styles.innerShadowBottom}
+                        style={[
+                          styles.innerShadowBottom,
+                          { backgroundColor: theme.isDark ? "rgba(0,0,0,0.18)" : "rgba(0,0,0,0.06)" }
+                        ]}
                       />
                     </View>
                   </View>
@@ -881,13 +831,20 @@ export function ProductPreview({
           )}
         </View>
 
-	        <View style={styles.heightDim}>
-	          <Ionicons name="arrow-up" size={14} color={theme.colors.textMuted} />
-	          <Text style={[styles.dimText, styles.dimTextVertical, { color: theme.colors.textMuted }]}>
-	            {hasDims ? heightLabel : "--"}
-	          </Text>
-	          <Ionicons name="arrow-down" size={14} color={theme.colors.textMuted} />
-	        </View>
+        <View style={styles.heightDim}>
+          <View
+            style={[
+              styles.dimArrow,
+              styles.dimArrowVertical,
+              { backgroundColor: theme.isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }
+            ]}
+          >
+            <Ionicons name="resize-outline" size={10} color={theme.colors.textMuted} />
+          </View>
+          <Text style={[styles.dimText, styles.dimTextVertical, { color: theme.colors.textMuted }]}>
+            {hasDims ? heightLabel : "--"}
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -910,15 +867,14 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
       borderWidth: 1,
       borderColor: theme.colors.border,
       backgroundColor: theme.colors.surface2,
-      paddingHorizontal: spacing.sm,
-      flexDirection: "row",
+      paddingHorizontal: 28,
       alignItems: "center",
-      justifyContent: "space-between",
-      gap: spacing.sm
+      justifyContent: "center",
+      position: "relative",
     },
-	    heightGutter: {
-	      width: 26
-	    },
+    heightGutter: {
+      width: 26
+    },
     mainRow: {
       flexDirection: "row",
       gap: spacing.sm
@@ -933,10 +889,28 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
     productWrap: {
       flex: 1,
       alignItems: "center",
-      justifyContent: "center"
+      justifyContent: "center",
+      gap: 2,
+    },
+    dimArrow: {
+      width: 16,
+      height: 16,
+      borderRadius: 8,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+    },
+    dimArrowHorizontal: {
+      position: "absolute",
+      left: 6,
+      top: 5,
+    },
+    dimArrowVertical: {
+      position: "absolute",
+      top: 6,
+      left: 5,
     },
     productShadow: {
-      borderRadius: radius.sm,
+      borderRadius: radius.md,
     },
     productClip: {
       flex: 1,
@@ -1060,13 +1034,31 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
     },
     glassSheen: {
       position: "absolute",
-      left: "10%",
-      top: "4%",
-      width: "42%",
-      height: "92%",
-      transform: [{ skewX: "-12deg" }],
+      left: "8%",
+      top: "3%",
+      width: "38%",
+      height: "94%",
+      transform: [{ skewX: "-14deg" }],
       borderRadius: 999,
+      opacity: 0.85,
+    },
+    glassAmbient: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      bottom: 0,
+      height: "40%",
       opacity: 0.9,
+    },
+    glassHighlight: {
+      position: "absolute",
+      left: "12%",
+      top: "8%",
+      width: "22%",
+      height: "18%",
+      borderRadius: 999,
+      opacity: 0.7,
+      transform: [{ rotate: "-25deg" }],
     },
     glassEdges: {
       ...StyleSheet.absoluteFillObject,
@@ -1146,32 +1138,42 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
       height: 22,
       opacity: 0.9,
     },
-	    heightDim: {
-	      width: 26,
-	      borderRadius: 999,
-	      borderWidth: 1,
-	      borderColor: theme.colors.border,
-	      backgroundColor: theme.colors.surface2,
+    heightDim: {
+      width: 26,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surface2,
       paddingVertical: spacing.sm,
       alignItems: "center",
-      justifyContent: "space-between"
+      justifyContent: "center",
+      position: "relative",
     },
-	    dimText: {
-	      ...font(800),
-	      fontSize: 12,
-	      letterSpacing: 0.2
-	    },
-	    dimTextVertical: {
-	      transform: [{ rotate: "90deg" }],
-	      width: 90,
-	      textAlign: "center",
-	    },
-	    placeholder: {
-	      flex: 1,
-	      alignItems: "center",
+    dimText: {
+      ...font(800),
+      fontSize: 12,
+      letterSpacing: 0.2,
+      textAlign: "center",
+    },
+    dimTextVertical: {
+      transform: [{ rotate: "90deg" }],
+      width: 90,
+      textAlign: "center",
+    },
+    placeholder: {
+      flex: 1,
+      alignItems: "center",
       justifyContent: "center",
       padding: spacing.md,
-      gap: spacing.xs
+      gap: spacing.md
+    },
+    placeholderIcon: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+      marginBottom: 4,
     },
     placeholderText: {
       ...font(700),

@@ -9,7 +9,6 @@ import { CatalogScreen } from "../screens/CatalogScreen";
 import { ContactsScreen } from "../screens/ContactsScreen";
 import { FaqScreen } from "../screens/FaqScreen";
 import { GalleryScreen } from "../screens/GalleryScreen";
-import { HomeScreen } from "../screens/HomeScreen";
 import { MoskitkiScreen } from "../screens/MoskitkiScreen";
 import { ProductDetailsScreen } from "../screens/ProductDetailsScreen";
 import { QuoteDetailsScreen } from "../screens/QuoteDetailsScreen";
@@ -61,7 +60,7 @@ export function AppNavigator({
       prefixes: [prefix, "https://kanokna.web.app", "https://kanokna.firebaseapp.com"],
       config: {
         screens: {
-          Home: "",
+          Catalog: { path: "", alias: ["catalog"] },
           Faq: {
             path: "faq/:section?",
             parse: {
@@ -70,7 +69,6 @@ export function AppNavigator({
             }
           },
           Moskitki: "moskitki",
-          Catalog: "catalog",
           Gallery: "gallery",
           Calculator: {
             path: "calculator/:presetProductType?",
@@ -108,10 +106,9 @@ export function AppNavigator({
           contentStyle: { backgroundColor: theme.colors.bg }
         }}
       >
-        <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="Catalog" component={CatalogScreen} />
         <Stack.Screen name="Faq" component={FaqScreen} />
         <Stack.Screen name="Moskitki" component={MoskitkiScreen} />
-        <Stack.Screen name="Catalog" component={CatalogScreen} />
         <Stack.Screen name="Gallery" component={GalleryScreen} />
         <Stack.Screen name="Calculator" component={CalculatorScreen} />
         <Stack.Screen name="Cart" component={CartScreen} />
