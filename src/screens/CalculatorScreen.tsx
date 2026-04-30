@@ -72,11 +72,7 @@ type ProfileCatalogItem = {
   legacyDepthMm?: number;
 };
 
-type HardwareCatalogItem = {
-  key: string;
-  label: string;
-  description?: string;
-};
+
 
 export function CalculatorScreen(): JSX.Element {
   const { t } = useTranslation();
@@ -133,9 +129,6 @@ export function CalculatorScreen(): JSX.Element {
   });
   const [activeSashIndex, setActiveSashIndex] = useState(0);
   const [windowMeetingPairNoMullion, setWindowMeetingPairNoMullion] = useState(false);
-  const [hardwareKey, setHardwareKey] = useState<string | null>(null);
-  const [hardwareLabel, setHardwareLabel] = useState<string | null>(null);
-
   const [profileModel, setProfileModel] = useState("kbe_expert_70");
   const [expandedProfileBrand, setExpandedProfileBrand] = useState<string | null>(null);
 
@@ -150,13 +143,6 @@ export function CalculatorScreen(): JSX.Element {
   const designDropdownAnchorRef = useRef<View | null>(null);
   const designPickerProgress = useRef(new Animated.Value(0)).current;
   const designPickerAnimRef = useRef<Animated.CompositeAnimation | null>(null);
-  const [hardwarePickerOpen, setHardwarePickerOpen] = useState(false);
-  const [hardwarePickerMounted, setHardwarePickerMounted] = useState(false);
-  const [hardwarePickerAnchorHeight, setHardwarePickerAnchorHeight] = useState(0);
-  const [hardwarePickerRect, setHardwarePickerRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
-  const hardwareDropdownAnchorRef = useRef<View | null>(null);
-  const hardwarePickerProgress = useRef(new Animated.Value(0)).current;
-  const hardwarePickerAnimRef = useRef<Animated.CompositeAnimation | null>(null);
   const [sashOpeningPickerOpen, setSashOpeningPickerOpen] = useState(false);
   const [sashOpeningPickerMounted, setSashOpeningPickerMounted] = useState(false);
   const [sashOpeningPickerSashIndex, setSashOpeningPickerSashIndex] = useState<number | null>(null);
@@ -244,52 +230,6 @@ export function CalculatorScreen(): JSX.Element {
     ],
     [t]
   );
-
-  const hardwareCatalog = useMemo<HardwareCatalogItem[]>(() => {
-    const raw = calcConfigQuery.data?.uiCatalog?.hardwareOptions ?? defaultUiCatalog.hardwareOptions;
-    if (!Array.isArray(raw)) return [];
-    return raw
-      .flatMap((item) => {
-        const key = typeof item?.key === "string" ? item.key.trim().toLowerCase() : "";
-        const label = typeof item?.label === "string" ? item.label.trim() : "";
-        const enabled = item?.enabled !== false;
-        if (!enabled || !key || !label) return [];
-        return [{
-          key,
-          label,
-          description: typeof item?.description === "string" ? item.description.trim() : undefined,
-        }];
-      })
-  }, [calcConfigQuery.data?.uiCatalog?.hardwareOptions, defaultUiCatalog.hardwareOptions]);
-
-  const hardwareAvailable = useMemo(() => {
-    if (productType !== "window") return true;
-    const desiredCount = Math.min(3, Math.max(1, Number(sashCount) || 1));
-    return windowSashes
-      .slice(0, desiredCount)
-      .some((sash) => sash.opening === "turn" || sash.opening === "tiltTurn");
-  }, [productType, sashCount, windowSashes]);
-
-  useEffect(() => {
-    if (!hardwareCatalog.length) {
-      if (hardwareKey !== null) setHardwareKey(null);
-      if (hardwareLabel !== null) setHardwareLabel(null);
-      return;
-    }
-
-    const currentKey = typeof hardwareKey === "string" ? hardwareKey.trim().toLowerCase() : "";
-    const matched = currentKey ? hardwareCatalog.find((opt) => opt.key === currentKey) : null;
-    const selected = matched ?? hardwareCatalog[0];
-
-    if (selected.key !== currentKey) setHardwareKey(selected.key);
-    if (selected.label !== hardwareLabel) setHardwareLabel(selected.label);
-  }, [hardwareCatalog, hardwareKey, hardwareLabel]);
-
-  useEffect(() => {
-    if (!hardwareAvailable && hardwarePickerOpen) {
-      setHardwarePickerOpen(false);
-    }
-  }, [hardwareAvailable, hardwarePickerOpen]);
 
   useEffect(() => {
     if (designOption === "none") {
@@ -478,12 +418,6 @@ export function CalculatorScreen(): JSX.Element {
   }, [activeEditorKey, designPickerOpen]);
 
   useEffect(() => {
-    if (activeEditorKey !== "construction" && hardwarePickerOpen) {
-      setHardwarePickerOpen(false);
-    }
-  }, [activeEditorKey, hardwarePickerOpen]);
-
-  useEffect(() => {
     if (activeEditorKey !== "construction" && sashOpeningPickerOpen) {
       setSashOpeningPickerOpen(false);
     }
@@ -506,11 +440,6 @@ export function CalculatorScreen(): JSX.Element {
       setSashOpeningPickerOpen(false);
     }
   }, [sashCount, sashOpeningPickerOpen, sashOpeningPickerSashIndex]);
-
-  useEffect(() => {
-    if (hardwareCatalog.length || !hardwarePickerOpen) return;
-    setHardwarePickerOpen(false);
-  }, [hardwareCatalog.length, hardwarePickerOpen]);
 
   const measureDesignPickerAnchor = () => {
     const node = designDropdownAnchorRef.current;
@@ -536,10 +465,6 @@ export function CalculatorScreen(): JSX.Element {
       return;
     }
 
-    if (hardwarePickerOpen) {
-      setHardwarePickerOpen(false);
-    }
-
     if (sashOpeningPickerOpen) {
       setSashOpeningPickerOpen(false);
     }
@@ -547,44 +472,6 @@ export function CalculatorScreen(): JSX.Element {
     requestAnimationFrame(() => {
       measureDesignPickerAnchor();
       setDesignPickerOpen(true);
-    });
-  };
-
-  const measureHardwarePickerAnchor = () => {
-    const node = hardwareDropdownAnchorRef.current;
-    if (!node || typeof node.measureInWindow !== "function") return;
-
-    node.measureInWindow((x, y, width, height) => {
-      if (
-        Number.isFinite(x) &&
-        Number.isFinite(y) &&
-        Number.isFinite(width) &&
-        Number.isFinite(height) &&
-        width > 0 &&
-        height > 0
-      ) {
-        setHardwarePickerRect({ x, y, width, height });
-      }
-    });
-  };
-
-  const onToggleHardwarePicker = () => {
-    if (hardwarePickerOpen) {
-      setHardwarePickerOpen(false);
-      return;
-    }
-
-    if (designPickerOpen) {
-      setDesignPickerOpen(false);
-    }
-
-    if (sashOpeningPickerOpen) {
-      setSashOpeningPickerOpen(false);
-    }
-
-    requestAnimationFrame(() => {
-      measureHardwarePickerAnchor();
-      setHardwarePickerOpen(true);
     });
   };
 
@@ -614,10 +501,6 @@ export function CalculatorScreen(): JSX.Element {
 
     if (designPickerOpen) {
       setDesignPickerOpen(false);
-    }
-
-    if (hardwarePickerOpen) {
-      setHardwarePickerOpen(false);
     }
 
     setSashOpeningPickerSashIndex(index);
@@ -672,41 +555,6 @@ export function CalculatorScreen(): JSX.Element {
       cancelAnimationFrame(frame);
     };
   }, [designPickerOpen, screenHeight, screenWidth]);
-
-  useEffect(() => {
-    if (hardwarePickerOpen) {
-      setHardwarePickerMounted(true);
-    }
-
-    hardwarePickerAnimRef.current?.stop();
-    const anim = Animated.timing(hardwarePickerProgress, {
-      toValue: hardwarePickerOpen ? 1 : 0,
-      duration: hardwarePickerOpen ? 180 : 130,
-      easing: hardwarePickerOpen ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
-      useNativeDriver: true
-    });
-
-    hardwarePickerAnimRef.current = anim;
-    anim.start(({ finished }) => {
-      if (finished && !hardwarePickerOpen) {
-        setHardwarePickerMounted(false);
-      }
-    });
-
-    return () => {
-      anim.stop();
-    };
-  }, [hardwarePickerOpen, hardwarePickerProgress]);
-
-  useEffect(() => {
-    if (!hardwarePickerOpen) return;
-    const frame = requestAnimationFrame(() => {
-      measureHardwarePickerAnchor();
-    });
-    return () => {
-      cancelAnimationFrame(frame);
-    };
-  }, [hardwarePickerOpen, screenHeight, screenWidth]);
 
   useEffect(() => {
     if (sashOpeningPickerOpen) {
@@ -765,11 +613,6 @@ export function CalculatorScreen(): JSX.Element {
       if (decorBars === "on") nextOptions.push("decor_bars");
     }
 
-    const normalizedHardwareKey =
-      hardwareAvailable && typeof hardwareKey === "string" ? hardwareKey.trim().toLowerCase() : "";
-    const normalizedHardwareLabel =
-      hardwareAvailable && typeof hardwareLabel === "string" ? hardwareLabel.trim() : "";
-    if (normalizedHardwareKey) nextOptions.push(normalizedHardwareKey);
     const uniqueOptions = Array.from(new Set(nextOptions));
 
     const normalizeOpening = (value: unknown): SashOpening => {
@@ -873,8 +716,6 @@ export function CalculatorScreen(): JSX.Element {
       openingType: derivedOpeningType,
       sashes,
       windowMeetingPairNoMullion: meetingPairNoMullionActive ? true : undefined,
-      hardwareKey: normalizedHardwareKey || undefined,
-      hardwareLabel: normalizedHardwareKey ? (normalizedHardwareLabel || undefined) : undefined,
 
       profileModel: selectedProfileModel?.key,
       profileSeries: (selectedProfileModel?.legacySeries as CalcInput["profileSeries"]) ?? "kbe",
@@ -911,9 +752,6 @@ export function CalculatorScreen(): JSX.Element {
     height,
     casing,
     designOption,
-    hardwareKey,
-    hardwareAvailable,
-    hardwareLabel,
     laminationColor,
     mosquitoNet,
     openingSashes,
@@ -1286,61 +1124,6 @@ export function CalculatorScreen(): JSX.Element {
   );
   const designMenuTop = Math.max(spacing.sm, designAnchorY + designAnchorMeasuredHeight + spacing.xs);
   const designMenuMaxHeight = Math.max(0, screenHeight - designMenuTop - spacing.sm);
-  const hardwareOptionItems: SelectListOption<string>[] = hardwareCatalog.map((opt) => {
-    const raw = calcConfigQuery.data?.options?.[opt.key];
-    const price =
-      typeof raw === "number"
-        ? raw
-        : raw && typeof raw === "object"
-          ? Number((raw as any)?.flat ?? 0)
-          : NaN;
-    const description = Number.isFinite(price)
-      ? price > 0
-        ? `+ ${formatMoney(price, currency)}`
-        : formatMoney(price, currency)
-      : undefined;
-    const helperText = [opt.description, description].filter(Boolean).join(" · ") || undefined;
-    return {
-      value: opt.key,
-      label: opt.label,
-      description: helperText,
-    };
-  });
-  const selectedHardwareOption =
-    hardwareOptionItems.find((item) => item.value === hardwareKey) ?? hardwareOptionItems[0] ?? null;
-  const hardwarePickerAnimatedStyle = {
-    opacity: hardwarePickerProgress,
-    transform: [
-      {
-        translateY: hardwarePickerProgress.interpolate({
-          inputRange: [0, 1],
-          outputRange: [-8, 0]
-        })
-      },
-      {
-        scale: hardwarePickerProgress.interpolate({
-          inputRange: [0, 1],
-          outputRange: [0.98, 1]
-        })
-      }
-    ]
-  };
-  const hardwareMenuBaseWidth = Math.max(220, Math.min(360, screenWidth - spacing.md * 2));
-  const hardwareAnchorX = hardwarePickerRect?.x ?? spacing.md;
-  const hardwareAnchorY = hardwarePickerRect?.y ?? spacing.md;
-  const hardwareAnchorWidth = hardwarePickerRect?.width ?? hardwareMenuBaseWidth;
-  const hardwareAnchorMeasuredHeight = hardwarePickerRect?.height ?? Math.max(46, hardwarePickerAnchorHeight || 46);
-  const hardwareMenuHorizontalMargin = spacing.sm;
-  const hardwareMenuWidth = Math.min(
-    Math.max(hardwareAnchorWidth, 220),
-    Math.max(220, screenWidth - hardwareMenuHorizontalMargin * 2)
-  );
-  const hardwareMenuLeft = Math.min(
-    Math.max(hardwareMenuHorizontalMargin, hardwareAnchorX),
-    Math.max(hardwareMenuHorizontalMargin, screenWidth - hardwareMenuWidth - hardwareMenuHorizontalMargin)
-  );
-  const hardwareMenuTop = Math.max(spacing.sm, hardwareAnchorY + hardwareAnchorMeasuredHeight + spacing.xs);
-  const hardwareMenuMaxHeight = Math.max(0, screenHeight - hardwareMenuTop - spacing.sm);
   const sashOpeningOptionItems: SelectListOption<SashOpening>[] = [
     { value: "fixed", label: t("calculator.openingTypes.fixed") },
     { value: "turn", label: t("calculator.openingTypes.turn") },
@@ -1408,13 +1191,11 @@ export function CalculatorScreen(): JSX.Element {
       ? [{ key: "openingType", icon: openingTypeIcon, label: t("calculator.openingType"), value: openingTypeLabel }]
       : []),
     { key: "profile", icon: "construct-outline", label: t("calculator.sectionProfile"), value: profileValue },
-    { key: "glazing", icon: "color-filter-outline", label: t("calculator.sectionGlazing"), value: glazingValue },
   ];
 
   const activeOptionItems: string[] = [];
   if (selectedGlassOption === "energySaving") activeOptionItems.push(t("calculator.energySaving"));
   if (selectedGlassOption === "multiFunctional") activeOptionItems.push(t("calculator.multiFunctional"));
-  if (hardwareAvailable && hardwareLabel && hardwareKey) activeOptionItems.push(`${t("calculator.hardware")}: ${hardwareLabel}`);
   if (designOption !== "none") {
     activeOptionItems.push(`${t("calculator.sectionDesign")}: ${designSummaryValue}`);
   }
@@ -1771,43 +1552,6 @@ export function CalculatorScreen(): JSX.Element {
                     {draftCalcDto.issues.warnings[0]?.message}
                   </Text>
                 ) : null}
-              </View>
-            ) : null}
-
-            {hardwareCatalog.length && hardwareAvailable ? (
-              <View style={styles.field}>
-                <View
-                  ref={hardwareDropdownAnchorRef}
-                  style={styles.designDropdownAnchor}
-                  onLayout={(event) => {
-                    const next = Math.round(event.nativeEvent.layout.height);
-                    if (next > 0 && next !== hardwarePickerAnchorHeight) {
-                      setHardwarePickerAnchorHeight(next);
-                    }
-                    if (hardwarePickerOpen) {
-                      requestAnimationFrame(() => {
-                        measureHardwarePickerAnchor();
-                      });
-                    }
-                  }}
-                >
-                  <PickerField
-                    variant="select"
-                    label={t("calculator.hardware")}
-                    active={hardwarePickerOpen}
-                    leftSlot={<Ionicons name="build-outline" size={ICON_SIZE.md} color={theme.colors.primary} />}
-                    rightSlot={
-                      <Ionicons
-                        name={hardwarePickerOpen ? "chevron-up" : "chevron-down"}
-                        size={18}
-                        color={theme.colors.textMuted}
-                      />
-                    }
-                    value={selectedHardwareOption?.label}
-                    helperText={selectedHardwareOption?.description}
-                    onPress={onToggleHardwarePicker}
-                  />
-                </View>
               </View>
             ) : null}
 
@@ -2343,25 +2087,6 @@ export function CalculatorScreen(): JSX.Element {
             maxHeight={designMenuMaxHeight}
             animatedStyle={designPickerAnimatedStyle}
             showVerticalScrollIndicator={designOptionItems.length > 5}
-          />
-          <SelectListModal
-            mounted={hardwarePickerMounted}
-            open={hardwarePickerOpen}
-            onClose={() => setHardwarePickerOpen(false)}
-            options={hardwareOptionItems}
-            value={selectedHardwareOption?.value ?? null}
-            onSelect={(next) => {
-              const selected = hardwareCatalog.find((item) => item.key === next);
-              setHardwareKey(next);
-              setHardwareLabel(selected?.label ?? null);
-              setHardwarePickerOpen(false);
-            }}
-            top={hardwareMenuTop}
-            left={hardwareMenuLeft}
-            width={hardwareMenuWidth}
-            maxHeight={hardwareMenuMaxHeight}
-            animatedStyle={hardwarePickerAnimatedStyle}
-            showVerticalScrollIndicator={hardwareOptionItems.length > 5}
           />
           <SelectListModal
             mounted={sashOpeningPickerMounted}
