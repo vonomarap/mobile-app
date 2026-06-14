@@ -6,6 +6,7 @@ import {
   Image,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -40,6 +41,7 @@ import { font } from "../theme/font";
 import { radius, spacing } from "../theme/tokens";
 import { useTheme } from "../theme/ThemeProvider";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { ICON_SIZE, calculatorSectionIcon } from "../theme/iconography";
 import { formatMoney } from "../utils/money";
 import { useCurrencyControls } from "../services/currency-context";
@@ -92,21 +94,53 @@ export function CalculatorScreen(): JSX.Element {
   type GlassOptionSelection = "none" | "energySaving" | "multiFunctional";
   type IoniconName = ComponentProps<typeof Ionicons>["name"];
   type DesignOption = "none" | "outside" | "inside" | "twoSideWhite" | "twoSideColor";
-  type EditorKey = "dimensions" | "construction" | "profile" | "glazing" | "design" | "extras";
+  type EditorKey = "dimensions" | "construction" | "profile" | "glazing" | "design" | "extras" | "summary";
 
-  const [activeEditorKey, setActiveEditorKey] = useState<EditorKey>("construction");
+  const presetProductType = route.params?.presetProductType;
+  const [productType, setProductType] = useState<"window" | "door" | "balconyBlock">(() => presetProductType ?? "window");
+
+  type CalcTab = "construction" | "profile" | "options" | "summary";
+  const tabsList = useMemo<CalcTab[]>(() => {
+    return ["construction", "profile", "options", "summary"];
+  }, []);
+
+  const [activeTab, setActiveTab] = useState<CalcTab>("construction");
+  const activeEditorKey = activeTab === "options" ? "design" : activeTab;
 
   useFocusEffect(
     useCallback(() => {
-      setActiveEditorKey("construction");
+      setActiveTab("construction");
     }, [])
   );
+
+  const stepAnimation = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    stepAnimation.setValue(0);
+    Animated.timing(stepAnimation, {
+      toValue: 1,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [activeTab]);
+
+  const animatedStepStyle = {
+    opacity: stepAnimation,
+    transform: [
+      {
+        translateX: stepAnimation.interpolate({
+          inputRange: [0, 1],
+          outputRange: [12, 0],
+        }),
+      },
+    ],
+  };
 
   const [width, setWidth] = useState("120");
   const [height, setHeight] = useState("140");
   const [quantity, setQuantity] = useState("1");
-  const presetProductType = route.params?.presetProductType;
-  const [productType, setProductType] = useState<"window" | "door">(() => presetProductType ?? "window");
+
   const [doorSubtype, setDoorSubtype] = useState<"balcony" | "interior" | "entrance">("balcony");
   const [doorHandleSide, setDoorHandleSide] = useState<HandleSide>("right");
 
@@ -159,6 +193,45 @@ export function CalculatorScreen(): JSX.Element {
 
   const [doorFillTop, setDoorFillTop] = useState<"glass" | "sandwich">("glass");
   const [doorFillBottom, setDoorFillBottom] = useState<"glass" | "sandwich">("sandwich");
+  const [doorSubtypePickerOpen, setDoorSubtypePickerOpen] = useState(false);
+  const [doorSubtypePickerMounted, setDoorSubtypePickerMounted] = useState(false);
+  const [doorSubtypePickerAnchorHeight, setDoorSubtypePickerAnchorHeight] = useState(0);
+  const [doorSubtypePickerRect, setDoorSubtypePickerRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const doorSubtypeDropdownAnchorRef = useRef<View | null>(null);
+  const doorSubtypePickerProgress = useRef(new Animated.Value(0)).current;
+  const doorSubtypePickerAnimRef = useRef<Animated.CompositeAnimation | null>(null);
+
+  const [doorFillPickerOpen, setDoorFillPickerOpen] = useState(false);
+  const [doorFillPickerMounted, setDoorFillPickerMounted] = useState(false);
+  const [doorFillPickerAnchorHeight, setDoorFillPickerAnchorHeight] = useState(0);
+  const [doorFillPickerRect, setDoorFillPickerRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const doorFillDropdownAnchorRef = useRef<View | null>(null);
+  const doorFillPickerProgress = useRef(new Animated.Value(0)).current;
+  const doorFillPickerAnimRef = useRef<Animated.CompositeAnimation | null>(null);
+
+  const [productTypePickerOpen, setProductTypePickerOpen] = useState(false);
+  const [productTypePickerMounted, setProductTypePickerMounted] = useState(false);
+  const [productTypePickerAnchorHeight, setProductTypePickerAnchorHeight] = useState(0);
+  const [productTypePickerRect, setProductTypePickerRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const productTypeDropdownAnchorRef = useRef<View | null>(null);
+  const productTypePickerProgress = useRef(new Animated.Value(0)).current;
+  const productTypePickerAnimRef = useRef<Animated.CompositeAnimation | null>(null);
+
+  const [glassOptionPickerOpen, setGlassOptionPickerOpen] = useState(false);
+  const [glassOptionPickerMounted, setGlassOptionPickerMounted] = useState(false);
+  const [glassOptionPickerAnchorHeight, setGlassOptionPickerAnchorHeight] = useState(0);
+  const [glassOptionPickerRect, setGlassOptionPickerRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const glassOptionDropdownAnchorRef = useRef<View | null>(null);
+  const glassOptionPickerProgress = useRef(new Animated.Value(0)).current;
+  const glassOptionPickerAnimRef = useRef<Animated.CompositeAnimation | null>(null);
+
+  const [sashCountPickerOpen, setSashCountPickerOpen] = useState(false);
+  const [sashCountPickerMounted, setSashCountPickerMounted] = useState(false);
+  const [sashCountPickerAnchorHeight, setSashCountPickerAnchorHeight] = useState(0);
+  const [sashCountPickerRect, setSashCountPickerRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const sashCountDropdownAnchorRef = useRef<View | null>(null);
+  const sashCountPickerProgress = useRef(new Animated.Value(0)).current;
+  const sashCountPickerAnimRef = useRef<Animated.CompositeAnimation | null>(null);
 
   // Extras
   const [mosquitoNet, setMosquitoNet] = useState<Toggle>("off");
@@ -350,7 +423,7 @@ export function CalculatorScreen(): JSX.Element {
   };
 
   useEffect(() => {
-    if (productType !== "window") return;
+    if (productType !== "window" && productType !== "balconyBlock") return;
 
     const normalizeOpening = (value: unknown): SashOpening => {
       if (value === "turn" || value === "tiltTurn") return value;
@@ -369,9 +442,11 @@ export function CalculatorScreen(): JSX.Element {
     setWindowSashes((prev) => {
       const next: WindowSashDraft[] = (Array.isArray(prev) ? prev : [])
         .slice(0, desiredCount)
-        .map((item) => {
-          const opening = normalizeOpening((item as any)?.opening);
+        .map((item, idx) => {
+          const isBalconyBlockDoor = productType === "balconyBlock" && idx === 0;
+          const opening = isBalconyBlockDoor ? "turn" : normalizeOpening((item as any)?.opening);
           const side = normalizeHandleSide((item as any)?.handleSide);
+          const handleSide = opening === "fixed" ? undefined : (side ?? "right");
           return {
             widthCm: typeof item?.widthCm === "string" ? item.widthCm : String((item as any)?.widthCm ?? ""),
             opening,
@@ -380,10 +455,12 @@ export function CalculatorScreen(): JSX.Element {
         });
 
       while (next.length < desiredCount) {
+        const idx = next.length;
+        const isBalconyBlockDoor = productType === "balconyBlock" && idx === 0;
         next.push({
           widthCm: totalWidthCm ? String(Math.round(totalWidthCm / desiredCount)) : "40",
-          opening: "fixed",
-          handleSide: undefined,
+          opening: isBalconyBlockDoor ? "turn" : "fixed",
+          handleSide: isBalconyBlockDoor ? "right" : undefined,
         });
       }
 
@@ -392,7 +469,7 @@ export function CalculatorScreen(): JSX.Element {
   }, [productType, sashCount, width]);
 
   useEffect(() => {
-    if (productType !== "window") return;
+    if (productType !== "window" && productType !== "balconyBlock") return;
     const desiredCount = Math.min(3, Math.max(1, Number(sashCount) || 1));
     const maxIndex = Math.max(0, desiredCount - 1);
     setActiveSashIndex((prev) => Math.min(maxIndex, Math.max(0, prev)));
@@ -412,6 +489,17 @@ export function CalculatorScreen(): JSX.Element {
   }, [doorSubtype, openingSashes, openingType, productType, sashCount]);
 
   useEffect(() => {
+    if (productType === "balconyBlock") {
+      const sc = Number(sashCount);
+      if (sc < 2 || sc > 3) {
+        setSashCount("2");
+      }
+    } else if (productType === "door") {
+      setSashCount("1");
+    }
+  }, [productType]);
+
+  useEffect(() => {
     if (activeEditorKey !== "design" && designPickerOpen) {
       setDesignPickerOpen(false);
     }
@@ -424,7 +512,7 @@ export function CalculatorScreen(): JSX.Element {
   }, [activeEditorKey, sashOpeningPickerOpen]);
 
   useEffect(() => {
-    if (productType !== "window" && sashOpeningPickerOpen) {
+    if (productType !== "window" && productType !== "balconyBlock" && sashOpeningPickerOpen) {
       setSashOpeningPickerOpen(false);
     }
   }, [productType, sashOpeningPickerOpen]);
@@ -468,10 +556,270 @@ export function CalculatorScreen(): JSX.Element {
     if (sashOpeningPickerOpen) {
       setSashOpeningPickerOpen(false);
     }
+    if (doorSubtypePickerOpen) {
+      setDoorSubtypePickerOpen(false);
+    }
+    if (doorFillPickerOpen) {
+      setDoorFillPickerOpen(false);
+    }
+    if (productTypePickerOpen) {
+      setProductTypePickerOpen(false);
+    }
+    if (glassOptionPickerOpen) {
+      setGlassOptionPickerOpen(false);
+    }
+    if (sashCountPickerOpen) {
+      setSashCountPickerOpen(false);
+    }
 
     requestAnimationFrame(() => {
       measureDesignPickerAnchor();
       setDesignPickerOpen(true);
+    });
+  };
+
+  const measureDoorSubtypePickerAnchor = () => {
+    const node = doorSubtypeDropdownAnchorRef.current;
+    if (!node || typeof node.measureInWindow !== "function") return;
+
+    node.measureInWindow((x, y, width, height) => {
+      if (
+        Number.isFinite(x) &&
+        Number.isFinite(y) &&
+        Number.isFinite(width) &&
+        Number.isFinite(height) &&
+        width > 0 &&
+        height > 0
+      ) {
+        setDoorSubtypePickerRect({ x, y, width, height });
+      }
+    });
+  };
+
+  const onToggleDoorSubtypePicker = () => {
+    if (doorSubtypePickerOpen) {
+      setDoorSubtypePickerOpen(false);
+      return;
+    }
+
+    if (designPickerOpen) {
+      setDesignPickerOpen(false);
+    }
+    if (sashOpeningPickerOpen) {
+      setSashOpeningPickerOpen(false);
+    }
+    if (doorFillPickerOpen) {
+      setDoorFillPickerOpen(false);
+    }
+    if (productTypePickerOpen) {
+      setProductTypePickerOpen(false);
+    }
+    if (glassOptionPickerOpen) {
+      setGlassOptionPickerOpen(false);
+    }
+    if (sashCountPickerOpen) {
+      setSashCountPickerOpen(false);
+    }
+
+    requestAnimationFrame(() => {
+      measureDoorSubtypePickerAnchor();
+      setDoorSubtypePickerOpen(true);
+    });
+  };
+
+  const measureDoorFillPickerAnchor = () => {
+    const node = doorFillDropdownAnchorRef.current;
+    if (!node || typeof node.measureInWindow !== "function") return;
+
+    node.measureInWindow((x, y, width, height) => {
+      if (
+        Number.isFinite(x) &&
+        Number.isFinite(y) &&
+        Number.isFinite(width) &&
+        Number.isFinite(height) &&
+        width > 0 &&
+        height > 0
+      ) {
+        setDoorFillPickerRect({ x, y, width, height });
+      }
+    });
+  };
+
+  const onToggleDoorFillPicker = () => {
+    if (doorFillPickerOpen) {
+      setDoorFillPickerOpen(false);
+      return;
+    }
+
+    if (designPickerOpen) {
+      setDesignPickerOpen(false);
+    }
+    if (sashOpeningPickerOpen) {
+      setSashOpeningPickerOpen(false);
+    }
+    if (doorSubtypePickerOpen) {
+      setDoorSubtypePickerOpen(false);
+    }
+    if (productTypePickerOpen) {
+      setProductTypePickerOpen(false);
+    }
+    if (glassOptionPickerOpen) {
+      setGlassOptionPickerOpen(false);
+    }
+    if (sashCountPickerOpen) {
+      setSashCountPickerOpen(false);
+    }
+
+    requestAnimationFrame(() => {
+      measureDoorFillPickerAnchor();
+      setDoorFillPickerOpen(true);
+    });
+  };
+
+  const measureProductTypePickerAnchor = () => {
+    const node = productTypeDropdownAnchorRef.current;
+    if (!node || typeof node.measureInWindow !== "function") return;
+
+    node.measureInWindow((x, y, width, height) => {
+      if (
+        Number.isFinite(x) &&
+        Number.isFinite(y) &&
+        Number.isFinite(width) &&
+        Number.isFinite(height) &&
+        width > 0 &&
+        height > 0
+      ) {
+        setProductTypePickerRect({ x, y, width, height });
+      }
+    });
+  };
+
+  const onToggleProductTypePicker = () => {
+    if (productTypePickerOpen) {
+      setProductTypePickerOpen(false);
+      return;
+    }
+
+    if (designPickerOpen) {
+      setDesignPickerOpen(false);
+    }
+    if (sashOpeningPickerOpen) {
+      setSashOpeningPickerOpen(false);
+    }
+    if (doorSubtypePickerOpen) {
+      setDoorSubtypePickerOpen(false);
+    }
+    if (doorFillPickerOpen) {
+      setDoorFillPickerOpen(false);
+    }
+    if (glassOptionPickerOpen) {
+      setGlassOptionPickerOpen(false);
+    }
+    if (sashCountPickerOpen) {
+      setSashCountPickerOpen(false);
+    }
+
+    requestAnimationFrame(() => {
+      measureProductTypePickerAnchor();
+      setProductTypePickerOpen(true);
+    });
+  };
+
+  const measureGlassOptionPickerAnchor = () => {
+    const node = glassOptionDropdownAnchorRef.current;
+    if (!node || typeof node.measureInWindow !== "function") return;
+
+    node.measureInWindow((x, y, width, height) => {
+      if (
+        Number.isFinite(x) &&
+        Number.isFinite(y) &&
+        Number.isFinite(width) &&
+        Number.isFinite(height) &&
+        width > 0 &&
+        height > 0
+      ) {
+        setGlassOptionPickerRect({ x, y, width, height });
+      }
+    });
+  };
+
+  const onToggleGlassOptionPicker = () => {
+    if (glassOptionPickerOpen) {
+      setGlassOptionPickerOpen(false);
+      return;
+    }
+
+    if (designPickerOpen) {
+      setDesignPickerOpen(false);
+    }
+    if (sashOpeningPickerOpen) {
+      setSashOpeningPickerOpen(false);
+    }
+    if (doorSubtypePickerOpen) {
+      setDoorSubtypePickerOpen(false);
+    }
+    if (doorFillPickerOpen) {
+      setDoorFillPickerOpen(false);
+    }
+    if (productTypePickerOpen) {
+      setProductTypePickerOpen(false);
+    }
+    if (sashCountPickerOpen) {
+      setSashCountPickerOpen(false);
+    }
+
+    requestAnimationFrame(() => {
+      measureGlassOptionPickerAnchor();
+      setGlassOptionPickerOpen(true);
+    });
+  };
+
+  const measureSashCountPickerAnchor = () => {
+    const node = sashCountDropdownAnchorRef.current;
+    if (!node || typeof node.measureInWindow !== "function") return;
+
+    node.measureInWindow((x, y, width, height) => {
+      if (
+        Number.isFinite(x) &&
+        Number.isFinite(y) &&
+        Number.isFinite(width) &&
+        Number.isFinite(height) &&
+        width > 0 &&
+        height > 0
+      ) {
+        setSashCountPickerRect({ x, y, width, height });
+      }
+    });
+  };
+
+  const onToggleSashCountPicker = () => {
+    if (sashCountPickerOpen) {
+      setSashCountPickerOpen(false);
+      return;
+    }
+
+    if (designPickerOpen) {
+      setDesignPickerOpen(false);
+    }
+    if (sashOpeningPickerOpen) {
+      setSashOpeningPickerOpen(false);
+    }
+    if (doorSubtypePickerOpen) {
+      setDoorSubtypePickerOpen(false);
+    }
+    if (doorFillPickerOpen) {
+      setDoorFillPickerOpen(false);
+    }
+    if (productTypePickerOpen) {
+      setProductTypePickerOpen(false);
+    }
+    if (glassOptionPickerOpen) {
+      setGlassOptionPickerOpen(false);
+    }
+
+    requestAnimationFrame(() => {
+      measureSashCountPickerAnchor();
+      setSashCountPickerOpen(true);
     });
   };
 
@@ -501,6 +849,12 @@ export function CalculatorScreen(): JSX.Element {
 
     if (designPickerOpen) {
       setDesignPickerOpen(false);
+    }
+    if (glassOptionPickerOpen) {
+      setGlassOptionPickerOpen(false);
+    }
+    if (sashCountPickerOpen) {
+      setSashCountPickerOpen(false);
     }
 
     setSashOpeningPickerSashIndex(index);
@@ -557,6 +911,211 @@ export function CalculatorScreen(): JSX.Element {
   }, [designPickerOpen, screenHeight, screenWidth]);
 
   useEffect(() => {
+    if (activeEditorKey !== "construction" && doorSubtypePickerOpen) {
+      setDoorSubtypePickerOpen(false);
+    }
+  }, [activeEditorKey, doorSubtypePickerOpen]);
+
+  useEffect(() => {
+    if (doorSubtypePickerOpen) {
+      setDoorSubtypePickerMounted(true);
+    }
+
+    doorSubtypePickerAnimRef.current?.stop();
+    const anim = Animated.timing(doorSubtypePickerProgress, {
+      toValue: doorSubtypePickerOpen ? 1 : 0,
+      duration: doorSubtypePickerOpen ? 180 : 130,
+      easing: doorSubtypePickerOpen ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
+      useNativeDriver: true
+    });
+
+    doorSubtypePickerAnimRef.current = anim;
+    anim.start(({ finished }) => {
+      if (finished && !doorSubtypePickerOpen) {
+        setDoorSubtypePickerMounted(false);
+      }
+    });
+
+    return () => {
+      anim.stop();
+    };
+  }, [doorSubtypePickerOpen, doorSubtypePickerProgress]);
+
+  useEffect(() => {
+    if (!doorSubtypePickerOpen) return;
+    const frame = requestAnimationFrame(() => {
+      measureDoorSubtypePickerAnchor();
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [doorSubtypePickerOpen, screenHeight, screenWidth]);
+
+  useEffect(() => {
+    if (activeEditorKey !== "construction" && doorFillPickerOpen) {
+      setDoorFillPickerOpen(false);
+    }
+  }, [activeEditorKey, doorFillPickerOpen]);
+
+  useEffect(() => {
+    if (doorFillPickerOpen) {
+      setDoorFillPickerMounted(true);
+    }
+
+    doorFillPickerAnimRef.current?.stop();
+    const anim = Animated.timing(doorFillPickerProgress, {
+      toValue: doorFillPickerOpen ? 1 : 0,
+      duration: doorFillPickerOpen ? 180 : 130,
+      easing: doorFillPickerOpen ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
+      useNativeDriver: true
+    });
+
+    doorFillPickerAnimRef.current = anim;
+    anim.start(({ finished }) => {
+      if (finished && !doorFillPickerOpen) {
+        setDoorFillPickerMounted(false);
+      }
+    });
+
+    return () => {
+      anim.stop();
+    };
+  }, [doorFillPickerOpen, doorFillPickerProgress]);
+
+  useEffect(() => {
+    if (!doorFillPickerOpen) return;
+    const frame = requestAnimationFrame(() => {
+      measureDoorFillPickerAnchor();
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [doorFillPickerOpen, screenHeight, screenWidth]);
+
+  useEffect(() => {
+    if (activeEditorKey !== "construction" && productTypePickerOpen) {
+      setProductTypePickerOpen(false);
+    }
+  }, [activeEditorKey, productTypePickerOpen]);
+
+  useEffect(() => {
+    if (productTypePickerOpen) {
+      setProductTypePickerMounted(true);
+    }
+
+    productTypePickerAnimRef.current?.stop();
+    const anim = Animated.timing(productTypePickerProgress, {
+      toValue: productTypePickerOpen ? 1 : 0,
+      duration: productTypePickerOpen ? 180 : 130,
+      easing: productTypePickerOpen ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
+      useNativeDriver: true
+    });
+
+    productTypePickerAnimRef.current = anim;
+    anim.start(({ finished }) => {
+      if (finished && !productTypePickerOpen) {
+        setProductTypePickerMounted(false);
+      }
+    });
+
+    return () => {
+      anim.stop();
+    };
+  }, [productTypePickerOpen, productTypePickerProgress]);
+
+  useEffect(() => {
+    if (!productTypePickerOpen) return;
+    const frame = requestAnimationFrame(() => {
+      measureProductTypePickerAnchor();
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [productTypePickerOpen, screenHeight, screenWidth]);
+
+  useEffect(() => {
+    if (activeEditorKey !== "profile" && glassOptionPickerOpen) {
+      setGlassOptionPickerOpen(false);
+    }
+  }, [activeEditorKey, glassOptionPickerOpen]);
+
+  useEffect(() => {
+    if (glassOptionPickerOpen) {
+      setGlassOptionPickerMounted(true);
+    }
+
+    glassOptionPickerAnimRef.current?.stop();
+    const anim = Animated.timing(glassOptionPickerProgress, {
+      toValue: glassOptionPickerOpen ? 1 : 0,
+      duration: glassOptionPickerOpen ? 180 : 130,
+      easing: glassOptionPickerOpen ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
+      useNativeDriver: true
+    });
+
+    glassOptionPickerAnimRef.current = anim;
+    anim.start(({ finished }) => {
+      if (finished && !glassOptionPickerOpen) {
+        setGlassOptionPickerMounted(false);
+      }
+    });
+
+    return () => {
+      anim.stop();
+    };
+  }, [glassOptionPickerOpen, glassOptionPickerProgress]);
+
+  useEffect(() => {
+    if (!glassOptionPickerOpen) return;
+    const frame = requestAnimationFrame(() => {
+      measureGlassOptionPickerAnchor();
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [glassOptionPickerOpen, screenHeight, screenWidth]);
+
+  useEffect(() => {
+    if (activeEditorKey !== "construction" && sashCountPickerOpen) {
+      setSashCountPickerOpen(false);
+    }
+  }, [activeEditorKey, sashCountPickerOpen]);
+
+  useEffect(() => {
+    if (sashCountPickerOpen) {
+      setSashCountPickerMounted(true);
+    }
+
+    sashCountPickerAnimRef.current?.stop();
+    const anim = Animated.timing(sashCountPickerProgress, {
+      toValue: sashCountPickerOpen ? 1 : 0,
+      duration: sashCountPickerOpen ? 180 : 130,
+      easing: sashCountPickerOpen ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
+      useNativeDriver: true
+    });
+
+    sashCountPickerAnimRef.current = anim;
+    anim.start(({ finished }) => {
+      if (finished && !sashCountPickerOpen) {
+        setSashCountPickerMounted(false);
+      }
+    });
+
+    return () => {
+      anim.stop();
+    };
+  }, [sashCountPickerOpen, sashCountPickerProgress]);
+
+  useEffect(() => {
+    if (!sashCountPickerOpen) return;
+    const frame = requestAnimationFrame(() => {
+      measureSashCountPickerAnchor();
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [sashCountPickerOpen, screenHeight, screenWidth]);
+
+  useEffect(() => {
     if (sashOpeningPickerOpen) {
       setSashOpeningPickerMounted(true);
     }
@@ -604,8 +1163,8 @@ export function CalculatorScreen(): JSX.Element {
 
     // Common extras
 
-    // Window extras
-    if (productType === "window") {
+    // Window / Balcony block extras
+    if (productType === "window" || productType === "balconyBlock") {
       if (mosquitoNet === "on") nextOptions.push("mosquito_net");
       if (windowSill === "on") nextOptions.push("window_sill");
       if (dripEdge === "on") nextOptions.push("drip_edge");
@@ -643,7 +1202,7 @@ export function CalculatorScreen(): JSX.Element {
     const totalWidthCm = Number.isFinite(totalWidthRaw) && totalWidthRaw > 0 ? Math.round(totalWidthRaw) : null;
 
     const sashes =
-      productType === "window"
+      productType === "window" || productType === "balconyBlock"
         ? (() => {
             const draft = windowSashes.slice(0, desiredSashCount);
             const safeCount = Math.min(3, Math.max(1, draft.length || desiredSashCount));
@@ -685,10 +1244,10 @@ export function CalculatorScreen(): JSX.Element {
       sashes.every((s) => s.opening !== "fixed");
 
     const windowSillWidthCmValue =
-      productType === "window" && windowSill === "on" ? normalizeWindowSillWidthCm(windowSillWidthCm) : undefined;
+      (productType === "window" || productType === "balconyBlock") && windowSill === "on" ? normalizeWindowSillWidthCm(windowSillWidthCm) : undefined;
     const dripEdgeWidthCmValue =
-      productType === "window" && dripEdge === "on" ? normalizeDripEdgeWidthCm(dripEdgeWidthCm) : undefined;
-    const decorBarsColorValue = productType === "window" && decorBars === "on" ? decorBarsColor : undefined;
+      (productType === "window" || productType === "balconyBlock") && dripEdge === "on" ? normalizeDripEdgeWidthCm(dripEdgeWidthCm) : undefined;
+    const decorBarsColorValue = (productType === "window" || productType === "balconyBlock") && decorBars === "on" ? decorBarsColor : undefined;
 
     const glassOptions: GlassOptionsInput =
       selectedGlassOption === "energySaving"
@@ -701,7 +1260,7 @@ export function CalculatorScreen(): JSX.Element {
       width: Number(width) / 100,
       height: Number(height) / 100,
       quantity: Number(quantity),
-      productType,
+      productType: productType === "balconyBlock" ? "balconyblock" : productType,
       material: "pvc",
       options: uniqueOptions,
       windowSillWidthCm: windowSillWidthCmValue,
@@ -728,7 +1287,7 @@ export function CalculatorScreen(): JSX.Element {
       laminationColor: lamination !== "none" ? (laminationColor ?? undefined) : undefined,
 
       entranceOptions:
-        productType === "door"
+        productType === "door" || productType === "balconyBlock"
           ? {
               fillTop: doorFillTop,
               fillBottom: doorFillBottom,
@@ -1000,7 +1559,7 @@ export function CalculatorScreen(): JSX.Element {
   const hasDims = Number.isFinite(widthCm) && widthCm > 0 && Number.isFinite(heightCm) && heightCm > 0;
   const sizeLabel = hasDims ? `${Math.round(widthCm)}×${Math.round(heightCm)} cm` : "--";
 
-  const windowSashSpecs = productType === "window" && Array.isArray(calcInput.sashes) ? calcInput.sashes : null;
+  const windowSashSpecs = (productType === "window" || productType === "balconyBlock") && Array.isArray(calcInput.sashes) ? calcInput.sashes : null;
   const meetingPairEligible =
     productType === "window" &&
     Boolean(windowSashSpecs?.length === 2 && windowSashSpecs.every((item) => item?.opening !== "fixed"));
@@ -1013,22 +1572,22 @@ export function CalculatorScreen(): JSX.Element {
 
   const previewSashes = isEntranceLikeDoor
     ? 1
-    : productType === "window" && windowSashSpecs && windowSashSpecs.length
+    : (productType === "window" || productType === "balconyBlock") && windowSashSpecs && windowSashSpecs.length
       ? windowSashSpecs.length
       : clampInt(Number(sashCount), 1, 3);
 
   const previewOpeningSashes = isEntranceLikeDoor
     ? 1
-    : productType === "window" && windowSashSpecs
+    : (productType === "window" || productType === "balconyBlock") && windowSashSpecs
       ? windowSashSpecs.reduce((acc, item) => acc + (item?.opening === "fixed" ? 0 : 1), 0)
       : clampInt(Number(openingSashes), 0, previewSashes);
 
-  const windowOpeningTypes = productType === "window" && windowSashSpecs
+  const windowOpeningTypes = (productType === "window" || productType === "balconyBlock") && windowSashSpecs
     ? new Set(windowSashSpecs.map((s) => s.opening).filter((o) => o === "turn" || o === "tiltTurn"))
     : null;
 
   const previewWindowSashes = useMemo<Array<{ widthCm: number; opening: SashOpening; handleSide?: HandleSide }> | undefined>(() => {
-    if (productType !== "window") return undefined;
+    if (productType !== "window" && productType !== "balconyBlock") return undefined;
     if (draftCalcDto?.sections?.length) {
       return draftCalcDto.sections.map((sec) => ({
         widthCm: Math.max(1, Math.round(sec.secW_mm / 10)),
@@ -1041,7 +1600,7 @@ export function CalculatorScreen(): JSX.Element {
 
   const openingTypeLabel =
     previewOpeningSashes > 0
-      ? productType === "window" && windowOpeningTypes
+      ? (productType === "window" || productType === "balconyBlock") && windowOpeningTypes
         ? windowOpeningTypes.size === 1
           ? t(`calculator.openingTypes.${Array.from(windowOpeningTypes)[0]}`)
           : t("calculator.openingTypes.mixed")
@@ -1050,7 +1609,7 @@ export function CalculatorScreen(): JSX.Element {
 
   const openingTypeIcon: IoniconName =
     previewOpeningSashes > 0
-      ? productType === "window" && windowOpeningTypes
+      ? (productType === "window" || productType === "balconyBlock") && windowOpeningTypes
         ? windowOpeningTypes.size === 1
           ? Array.from(windowOpeningTypes)[0] === "turn"
             ? "arrow-forward"
@@ -1064,7 +1623,9 @@ export function CalculatorScreen(): JSX.Element {
   const typeValue =
     productType === "door"
       ? `${t("calculator.types.door")} · ${t(`calculator.doorSubtypes.${doorSubtype}`)}`
-      : t("calculator.types.window");
+      : productType === "balconyBlock"
+        ? t("calculator.types.balconyBlock")
+        : t("calculator.types.window");
 
   const profileDepthPreviewKey =
     (selectedProfileModel?.depthMm ?? 70) <= 60 ? "60" : (selectedProfileModel?.depthMm ?? 70) >= 80 ? "85" : "70";
@@ -1108,6 +1669,228 @@ export function CalculatorScreen(): JSX.Element {
       }
     ]
   };
+  const doorSubtypePickerAnimatedStyle = {
+    opacity: doorSubtypePickerProgress,
+    transform: [
+      {
+        translateY: doorSubtypePickerProgress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [-8, 0]
+        })
+      },
+      {
+        scale: doorSubtypePickerProgress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.98, 1]
+        })
+      }
+    ]
+  };
+
+  const productTypeOptionItems: SelectListOption<"window" | "door" | "balconyBlock">[] = [
+    { value: "window", label: t("calculator.types.window") },
+    { value: "door", label: t("calculator.types.door") },
+    { value: "balconyBlock", label: t("calculator.types.balconyBlock") }
+  ];
+
+  const productTypeMenuBaseWidth = Math.max(220, Math.min(360, screenWidth - spacing.md * 2));
+  const productTypeAnchorX = productTypePickerRect?.x ?? spacing.md;
+  const productTypeAnchorY = productTypePickerRect?.y ?? spacing.md;
+  const productTypeAnchorWidth = productTypePickerRect?.width ?? productTypeMenuBaseWidth;
+  const productTypeAnchorMeasuredHeight = productTypePickerRect?.height ?? Math.max(46, productTypePickerAnchorHeight || 46);
+  const productTypeMenuHorizontalMargin = spacing.sm;
+  const productTypeMenuWidth = Math.min(
+    Math.max(productTypeAnchorWidth, 220),
+    Math.max(220, screenWidth - productTypeMenuHorizontalMargin * 2)
+  );
+  const productTypeMenuLeft = Math.min(
+    Math.max(productTypeMenuHorizontalMargin, productTypeAnchorX),
+    Math.max(productTypeMenuHorizontalMargin, screenWidth - productTypeMenuWidth - productTypeMenuHorizontalMargin)
+  );
+  const productTypeMenuTop = Math.max(spacing.sm, productTypeAnchorY + productTypeAnchorMeasuredHeight + spacing.xs);
+  const productTypeMenuMaxHeight = Math.max(0, screenHeight - productTypeMenuTop - spacing.sm);
+
+  const productTypePickerAnimatedStyle = {
+    opacity: productTypePickerProgress,
+    transform: [
+      {
+        translateY: productTypePickerProgress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [-8, 0]
+        })
+      },
+      {
+        scale: productTypePickerProgress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.98, 1]
+        })
+      }
+    ]
+  };
+
+  const glassOptionMenuBaseWidth = Math.max(220, Math.min(360, screenWidth - spacing.md * 2));
+  const glassOptionAnchorX = glassOptionPickerRect?.x ?? spacing.md;
+  const glassOptionAnchorY = glassOptionPickerRect?.y ?? spacing.md;
+  const glassOptionAnchorWidth = glassOptionPickerRect?.width ?? glassOptionMenuBaseWidth;
+  const glassOptionAnchorMeasuredHeight = glassOptionPickerRect?.height ?? Math.max(46, glassOptionPickerAnchorHeight || 46);
+  const glassOptionMenuHorizontalMargin = spacing.sm;
+  const glassOptionMenuWidth = Math.min(
+    Math.max(glassOptionAnchorWidth, 220),
+    Math.max(220, screenWidth - glassOptionMenuHorizontalMargin * 2)
+  );
+  const glassOptionMenuLeft = Math.min(
+    Math.max(glassOptionMenuHorizontalMargin, glassOptionAnchorX),
+    Math.max(glassOptionMenuHorizontalMargin, screenWidth - glassOptionMenuWidth - glassOptionMenuHorizontalMargin)
+  );
+  const glassOptionMenuTop = Math.max(spacing.sm, glassOptionAnchorY + glassOptionAnchorMeasuredHeight + spacing.xs);
+  const glassOptionMenuMaxHeight = Math.max(0, screenHeight - glassOptionMenuTop - spacing.sm);
+
+  const glassOptionPickerAnimatedStyle = {
+    opacity: glassOptionPickerProgress,
+    transform: [
+      {
+        translateY: glassOptionPickerProgress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [-8, 0]
+        })
+      },
+      {
+        scale: glassOptionPickerProgress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.98, 1]
+        })
+      }
+    ]
+  };
+
+  const sashCountMenuBaseWidth = Math.max(220, Math.min(360, screenWidth - spacing.md * 2));
+  const sashCountAnchorX = sashCountPickerRect?.x ?? spacing.md;
+  const sashCountAnchorY = sashCountPickerRect?.y ?? spacing.md;
+  const sashCountAnchorWidth = sashCountPickerRect?.width ?? sashCountMenuBaseWidth;
+  const sashCountAnchorMeasuredHeight = sashCountPickerRect?.height ?? Math.max(46, sashCountPickerAnchorHeight || 46);
+  const sashCountMenuHorizontalMargin = spacing.sm;
+  const sashCountMenuWidth = Math.min(
+    Math.max(sashCountAnchorWidth, 220),
+    Math.max(220, screenWidth - sashCountMenuHorizontalMargin * 2)
+  );
+  const sashCountMenuLeft = Math.min(
+    Math.max(sashCountMenuHorizontalMargin, sashCountAnchorX),
+    Math.max(sashCountMenuHorizontalMargin, screenWidth - sashCountMenuWidth - sashCountMenuHorizontalMargin)
+  );
+  const sashCountMenuTop = Math.max(spacing.sm, sashCountAnchorY + sashCountAnchorMeasuredHeight + spacing.xs);
+  const sashCountMenuMaxHeight = Math.max(0, screenHeight - sashCountMenuTop - spacing.sm);
+
+  const sashCountPickerAnimatedStyle = {
+    opacity: sashCountPickerProgress,
+    transform: [
+      {
+        translateY: sashCountPickerProgress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [-8, 0]
+        })
+      },
+      {
+        scale: sashCountPickerProgress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.98, 1]
+        })
+      }
+    ]
+  };
+
+  const sashCountOptionItems = useMemo<SelectListOption<SashCount>[]>(() => {
+    const isBalcony = productType === "balconyBlock";
+    const values: SashCount[] = isBalcony ? ["2", "3"] : ["1", "2", "3"];
+
+    return values.map((val) => {
+      const labelKey = isBalcony ? `calculator.sashCounts.balconyBlock.${val}` : `calculator.sashCounts.window.${val}`;
+      return {
+        value: val,
+        label: t(labelKey)
+      };
+    });
+  }, [productType, t]);
+
+  const activeSashCountLabel = useMemo(() => {
+    return sashCountOptionItems.find((item) => item.value === sashCount)?.label ?? "";
+  }, [sashCountOptionItems, sashCount]);
+
+  const doorSubtypeOptionItems: SelectListOption<string>[] = [
+    { value: "balcony", label: t("calculator.doorSubtypes.balcony") },
+    { value: "interior", label: t("calculator.doorSubtypes.interior") },
+    { value: "entrance", label: t("calculator.doorSubtypes.entrance") }
+  ];
+
+  const selectedDoorSubtypeOption =
+    doorSubtypeOptionItems.find((item) => item.value === doorSubtype) ?? doorSubtypeOptionItems[0];
+
+  const doorSubtypeMenuBaseWidth = Math.max(220, Math.min(360, screenWidth - spacing.md * 2));
+  const doorSubtypeAnchorX = doorSubtypePickerRect?.x ?? spacing.md;
+  const doorSubtypeAnchorY = doorSubtypePickerRect?.y ?? spacing.md;
+  const doorSubtypeAnchorWidth = doorSubtypePickerRect?.width ?? doorSubtypeMenuBaseWidth;
+  const doorSubtypeAnchorMeasuredHeight = doorSubtypePickerRect?.height ?? Math.max(46, doorSubtypePickerAnchorHeight || 46);
+  const doorSubtypeMenuHorizontalMargin = spacing.sm;
+  const doorSubtypeMenuWidth = Math.min(
+    Math.max(doorSubtypeAnchorWidth, 220),
+    Math.max(220, screenWidth - doorSubtypeMenuHorizontalMargin * 2)
+  );
+  const doorSubtypeMenuLeft = Math.min(
+    Math.max(doorSubtypeMenuHorizontalMargin, doorSubtypeAnchorX),
+    Math.max(doorSubtypeMenuHorizontalMargin, screenWidth - doorSubtypeMenuWidth - doorSubtypeMenuHorizontalMargin)
+  );
+  const doorSubtypeMenuTop = Math.max(spacing.sm, doorSubtypeAnchorY + doorSubtypeAnchorMeasuredHeight + spacing.xs);
+  const doorSubtypeMenuMaxHeight = Math.max(0, screenHeight - doorSubtypeMenuTop - spacing.sm);
+
+  const doorFillPickerAnimatedStyle = {
+    opacity: doorFillPickerProgress,
+    transform: [
+      {
+        translateY: doorFillPickerProgress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [-8, 0]
+        })
+      },
+      {
+        scale: doorFillPickerProgress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.98, 1]
+        })
+      }
+    ]
+  };
+
+  const doorFillOptionItems: SelectListOption<string>[] = [
+    { value: "glass", label: t("calculator.entrance.fillTypes.glass") },
+    { value: "sandwich", label: t("calculator.entrance.fillTypes.sandwich") },
+    { value: "combined", label: t("calculator.entrance.fillTypes.combined") }
+  ];
+
+  const doorFill = (doorFillTop === "glass" && doorFillBottom === "glass")
+    ? "glass"
+    : (doorFillTop === "sandwich" && doorFillBottom === "sandwich")
+      ? "sandwich"
+      : "combined";
+
+  const selectedDoorFillOption =
+    doorFillOptionItems.find((item) => item.value === doorFill) ?? doorFillOptionItems[0];
+
+  const doorFillMenuBaseWidth = Math.max(220, Math.min(360, screenWidth - spacing.md * 2));
+  const doorFillAnchorX = doorFillPickerRect?.x ?? spacing.md;
+  const doorFillAnchorY = doorFillPickerRect?.y ?? spacing.md;
+  const doorFillAnchorWidth = doorFillPickerRect?.width ?? doorFillMenuBaseWidth;
+  const doorFillAnchorMeasuredHeight = doorFillPickerRect?.height ?? Math.max(46, doorFillPickerAnchorHeight || 46);
+  const doorFillMenuHorizontalMargin = spacing.sm;
+  const doorFillMenuWidth = Math.min(
+    Math.max(doorFillAnchorWidth, 220),
+    Math.max(220, screenWidth - doorFillMenuHorizontalMargin * 2)
+  );
+  const doorFillMenuLeft = Math.min(
+    Math.max(doorFillMenuHorizontalMargin, doorFillAnchorX),
+    Math.max(doorFillMenuHorizontalMargin, screenWidth - doorFillMenuWidth - doorFillMenuHorizontalMargin)
+  );
+  const doorFillMenuTop = Math.max(spacing.sm, doorFillAnchorY + doorFillAnchorMeasuredHeight + spacing.xs);
+  const doorFillMenuMaxHeight = Math.max(0, screenHeight - doorFillMenuTop - spacing.sm);
+
   const designMenuBaseWidth = Math.max(220, Math.min(360, screenWidth - spacing.md * 2));
   const designAnchorX = designPickerRect?.x ?? spacing.md;
   const designAnchorY = designPickerRect?.y ?? spacing.md;
@@ -1177,7 +1960,7 @@ export function CalculatorScreen(): JSX.Element {
   const designSummaryValue = designOption !== "none" && laminationColorLabel ? `${designValue} · ${laminationColorLabel}` : designValue;
 
   let extrasEnabledCount = 0;
-  if (productType === "window") {
+  if (productType === "window" || productType === "balconyBlock") {
     if (mosquitoNet === "on") extrasEnabledCount++;
     if (windowSill === "on") extrasEnabledCount++;
     if (dripEdge === "on") extrasEnabledCount++;
@@ -1186,61 +1969,7 @@ export function CalculatorScreen(): JSX.Element {
   }
   const extrasValue = extrasEnabledCount === 0 ? t("calculator.preview.none") : `${extrasEnabledCount}`;
 
-  const previewChips: Array<{ key: string; icon: IoniconName; label: string; value: string }> = [
-    ...(productType === "window"
-      ? [{ key: "openingType", icon: openingTypeIcon, label: t("calculator.openingType"), value: openingTypeLabel }]
-      : []),
-    { key: "profile", icon: "construct-outline", label: t("calculator.sectionProfile"), value: profileValue },
-  ];
 
-  const activeOptionItems: string[] = [];
-  if (selectedGlassOption === "energySaving") activeOptionItems.push(t("calculator.energySaving"));
-  if (selectedGlassOption === "multiFunctional") activeOptionItems.push(t("calculator.multiFunctional"));
-  if (designOption !== "none") {
-    activeOptionItems.push(`${t("calculator.sectionDesign")}: ${designSummaryValue}`);
-  }
-
-  if (productType === "window") {
-    if (mosquitoNet === "on") activeOptionItems.push(t("calculator.extras.mosquitoNet"));
-    if (windowSill === "on") {
-      const w = typeof calcInput.windowSillWidthCm === "number" ? Math.round(calcInput.windowSillWidthCm) : null;
-      activeOptionItems.push(w ? `${t("calculator.extras.windowSill")} (${w} cm)` : t("calculator.extras.windowSill"));
-    }
-    if (dripEdge === "on") {
-      const w = typeof calcInput.dripEdgeWidthCm === "number" ? Math.round(calcInput.dripEdgeWidthCm) : null;
-      activeOptionItems.push(w ? `${t("calculator.extras.dripEdge")} (${w} cm)` : t("calculator.extras.dripEdge"));
-    }
-    if (casing === "on") activeOptionItems.push(t("calculator.extras.casing"));
-    if (decorBars === "on") {
-      const key =
-        calcInput.decorBarsColor === "gold" || calcInput.decorBarsColor === "white" || calcInput.decorBarsColor === "brown"
-          ? calcInput.decorBarsColor
-          : null;
-      const label = key ? t(`common.colors.${key}`) : "";
-      activeOptionItems.push(label ? `${t("calculator.extras.decorBars")} (${label})` : t("calculator.extras.decorBars"));
-    }
-  }
-
-  const MAX_ACTIVE_OPTIONS = 6;
-  const activeOptionsText =
-    activeOptionItems.length === 0
-      ? t("calculator.preview.none")
-      : activeOptionItems.length > MAX_ACTIVE_OPTIONS
-      ? [
-          ...activeOptionItems.slice(0, MAX_ACTIVE_OPTIONS),
-          t("calculator.preview.andMore", { count: activeOptionItems.length - MAX_ACTIVE_OPTIONS })
-        ].join(", ")
-      : activeOptionItems.join(", ");
-
-  const PreviewChip = ({ icon, label, value }: { icon: IoniconName; label: string; value: string }) => (
-    <View style={[styles.previewChip, { backgroundColor: theme.colors.surface2, borderColor: theme.colors.border }]}>
-      <Ionicons name={icon} size={14} color={theme.colors.primary} />
-      <Text style={styles.previewChipText} numberOfLines={1}>
-        <Text style={[styles.previewChipLabel, { color: theme.colors.textMuted }]}>{label}: </Text>
-        <Text style={[styles.previewChipValue, { color: theme.colors.text }]}>{value}</Text>
-      </Text>
-    </View>
-  );
 
   const editorSections: Array<{
     key: EditorKey;
@@ -1278,7 +2007,7 @@ export function CalculatorScreen(): JSX.Element {
       value: designSummaryValue,
       icon: calculatorSectionIcon.design
     },
-    ...(productType === "window"
+    ...(productType === "window" || productType === "balconyBlock"
       ? [
           {
             key: "extras" as const,
@@ -1290,117 +2019,148 @@ export function CalculatorScreen(): JSX.Element {
       : []),
   ];
 
-  const resolvedActiveEditorKey = editorSections.some((section) => section.key === activeEditorKey)
-    ? activeEditorKey
-    : (editorSections[0]?.key ?? "construction");
-
-  useEffect(() => {
-    if (resolvedActiveEditorKey !== activeEditorKey) {
-      setActiveEditorKey(resolvedActiveEditorKey);
-    }
-  }, [activeEditorKey, resolvedActiveEditorKey]);
-
-  const renderEditorBody = (editorKey: EditorKey) => {
-    switch (editorKey) {
-      case "dimensions":
-        return (
-          <View style={styles.grid}>
-            <RangeField
-              label={t("calculator.width")}
-              labelRightSlot={<HelpIcon onPress={() => setHelpKey("width")} accessibilityLabel={t("calculator.width")} />}
-              value={width}
-              onChangeText={setWidth}
-              min={40}
-              max={300}
-              step={1}
-              unit="cm"
-            />
-            <RangeField
-              label={t("calculator.height")}
-              labelRightSlot={<HelpIcon onPress={() => setHelpKey("height")} accessibilityLabel={t("calculator.height")} />}
-              value={height}
-              onChangeText={setHeight}
-              min={40}
-              max={300}
-              step={1}
-              unit="cm"
-            />
-            <StepperField
-              label={t("calculator.quantity")}
-              value={quantity}
-              onChangeText={setQuantity}
-              min={1}
-              max={20}
-              step={1}
-              allowDirectEdit
-            />
-          </View>
-        );
-
+  const renderEditorBody = (tabKey: CalcTab) => {
+    switch (tabKey) {
       case "construction":
         return (
           <View style={styles.field}>
             <View style={styles.field}>
-              <FieldLabel text={t("calculator.productType")} helpId="productType" />
-              <SegmentedControl
-                value={productType}
-                onChange={setProductType}
-                options={[
-                  { value: "window", label: t("calculator.types.window") },
-                  { value: "door", label: t("calculator.types.door") }
-                ]}
+              <View
+                ref={productTypeDropdownAnchorRef}
+                style={styles.designDropdownAnchor}
+                onLayout={(event) => {
+                  const next = Math.round(event.nativeEvent.layout.height);
+                  if (next > 0 && next !== productTypePickerAnchorHeight) {
+                    setProductTypePickerAnchorHeight(next);
+                  }
+                  if (productTypePickerOpen) {
+                    requestAnimationFrame(() => {
+                      measureProductTypePickerAnchor();
+                    });
+                  }
+                }}
+              >
+                <PickerField
+                  variant="select"
+                  label={t("calculator.productType")}
+                  labelRightSlot={<HelpIcon onPress={() => setHelpKey("productType")} accessibilityLabel={t("calculator.productType")} />}
+                  active={productTypePickerOpen}
+                  rightSlot={
+                    <Ionicons
+                      name={productTypePickerOpen ? "chevron-up" : "chevron-down"}
+                      size={18}
+                      color={theme.colors.textMuted}
+                    />
+                  }
+                  value={
+                    productType === "window"
+                      ? t("calculator.types.window")
+                      : productType === "door"
+                        ? t("calculator.types.door")
+                        : t("calculator.types.balconyBlock")
+                  }
+                  onPress={onToggleProductTypePicker}
+                />
+              </View>
+            </View>
+
+            <View style={styles.field}>
+              <RangeField
+                label={t("calculator.width")}
+                labelRightSlot={<HelpIcon onPress={() => setHelpKey("width")} accessibilityLabel={t("calculator.width")} />}
+                value={width}
+                onChangeText={setWidth}
+                min={40}
+                max={300}
+                step={1}
+                unit="cm"
+              />
+              <RangeField
+                label={t("calculator.height")}
+                labelRightSlot={<HelpIcon onPress={() => setHelpKey("height")} accessibilityLabel={t("calculator.height")} />}
+                value={height}
+                onChangeText={setHeight}
+                min={40}
+                max={300}
+                step={1}
+                unit="cm"
               />
             </View>
 
             {productType === "door" ? (
               <View style={styles.field}>
-                <FieldLabel text={t("calculator.doorSubtype")} helpId="doorSubtype" />
-                <SegmentedControl
-                  value={doorSubtype}
-                  onChange={setDoorSubtype}
-                  options={[
-                    { value: "balcony", label: t("calculator.doorSubtypes.balcony") },
-                    { value: "interior", label: t("calculator.doorSubtypes.interior") },
-                    { value: "entrance", label: t("calculator.doorSubtypes.entrance") }
-                  ]}
-                />
-              </View>
-            ) : null}
-
-            {productType === "door" && (isEntranceLikeDoor || Number(openingSashes) > 0) ? (
-              <View style={styles.field}>
-                <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>
-                  {t("calculator.handleSide")}
-                </Text>
-                <SegmentedControl
-                  value={doorHandleSide}
-                  onChange={(next) => setDoorHandleSide(next as HandleSide)}
-                  options={[
-                    { value: "left" as HandleSide, label: t("calculator.handleSides.left") },
-                    { value: "right" as HandleSide, label: t("calculator.handleSides.right") },
-                  ]}
-                />
-              </View>
-            ) : null}
-
-            {productType === "window" ? (
-              <View style={[styles.grid, isWide ? styles.gridWide : null]}>
-                <View style={styles.gridItem}>
-                  <StepperField
-                    label={t("calculator.sashCount")}
-                    value={sashCount}
-                    onChangeText={(next) => setSashCount(next as SashCount)}
-                    min={1}
-                    max={sashMax}
-                    step={1}
-                    allowDirectEdit={false}
-                    disabled={isEntranceLikeDoor}
+                <View
+                  ref={doorSubtypeDropdownAnchorRef}
+                  style={styles.designDropdownAnchor}
+                  onLayout={(event) => {
+                    const next = Math.round(event.nativeEvent.layout.height);
+                    if (next > 0 && next !== doorSubtypePickerAnchorHeight) {
+                      setDoorSubtypePickerAnchorHeight(next);
+                    }
+                    if (doorSubtypePickerOpen) {
+                      requestAnimationFrame(() => {
+                        measureDoorSubtypePickerAnchor();
+                      });
+                    }
+                  }}
+                >
+                  <PickerField
+                    variant="select"
+                    label={t("calculator.doorSubtype")}
+                    labelRightSlot={<HelpIcon onPress={() => setHelpKey("doorSubtype")} accessibilityLabel={t("calculator.doorSubtype")} />}
+                    active={doorSubtypePickerOpen}
+                    rightSlot={
+                      <Ionicons
+                        name={doorSubtypePickerOpen ? "chevron-up" : "chevron-down"}
+                        size={18}
+                        color={theme.colors.textMuted}
+                      />
+                    }
+                    value={selectedDoorSubtypeOption?.label}
+                    onPress={onToggleDoorSubtypePicker}
                   />
                 </View>
               </View>
             ) : null}
 
-            {productType === "window" ? (
+            {productType === "window" || productType === "balconyBlock" ? (
+              <View style={[styles.grid, isWide ? styles.gridWide : null]}>
+                <View style={styles.gridItem}>
+                  <View
+                    ref={sashCountDropdownAnchorRef}
+                    style={styles.designDropdownAnchor}
+                    onLayout={(event) => {
+                      const next = Math.round(event.nativeEvent.layout.height);
+                      if (next > 0 && next !== sashCountPickerAnchorHeight) {
+                        setSashCountPickerAnchorHeight(next);
+                      }
+                      if (sashCountPickerOpen) {
+                        requestAnimationFrame(() => {
+                          measureSashCountPickerAnchor();
+                        });
+                      }
+                    }}
+                  >
+                    <PickerField
+                      variant="select"
+                      label={t("calculator.sashCount")}
+                      active={sashCountPickerOpen}
+                      rightSlot={
+                        <Ionicons
+                          name={sashCountPickerOpen ? "chevron-up" : "chevron-down"}
+                          size={18}
+                          color={theme.colors.textMuted}
+                        />
+                      }
+                      value={activeSashCountLabel}
+                      onPress={onToggleSashCountPicker}
+                    />
+                  </View>
+                </View>
+              </View>
+            ) : null}
+
+            {productType === "window" || productType === "balconyBlock" ? (
               <View style={styles.field}>
                 <Text style={[styles.subSectionTitle, { color: theme.colors.text }]}>
                   {t("calculator.sashesEditorTitle")}
@@ -1477,50 +2237,41 @@ export function CalculatorScreen(): JSX.Element {
                                   }
                                 }}
                               >
-                                <PickerField
-                                  variant="select"
-                                  label={t("calculator.sashOpening")}
-                                  active={sashOpeningPickerOpen && sashOpeningPickerSashIndex === idx}
-                                  value={
-                                    sash.opening === "turn"
-                                      ? t("calculator.openingTypes.turn")
-                                      : sash.opening === "tiltTurn"
-                                        ? t("calculator.openingTypes.tiltTurn")
-                                        : t("calculator.openingTypes.fixed")
-                                  }
-                                  rightSlot={
-                                    <Ionicons
-                                      name={sashOpeningPickerOpen && sashOpeningPickerSashIndex === idx ? "chevron-up" : "chevron-down"}
-                                      size={18}
-                                      color={theme.colors.textMuted}
-                                    />
-                                  }
-                                  onPress={() => onToggleSashOpeningPicker(idx)}
-                                />
+                                {!(productType === "balconyBlock" && idx === 0) ? (
+                                  <PickerField
+                                    variant="select"
+                                    label={t("calculator.sashOpening")}
+                                    active={sashOpeningPickerOpen && sashOpeningPickerSashIndex === idx}
+                                    value={
+                                      sash.opening === "turn"
+                                        ? t("calculator.openingTypes.turn")
+                                        : sash.opening === "tiltTurn"
+                                          ? t("calculator.openingTypes.tiltTurn")
+                                          : t("calculator.openingTypes.fixed")
+                                    }
+                                    rightSlot={
+                                      <Ionicons
+                                        name={sashOpeningPickerOpen && sashOpeningPickerSashIndex === idx ? "chevron-up" : "chevron-down"}
+                                        size={18}
+                                        color={theme.colors.textMuted}
+                                      />
+                                    }
+                                    onPress={() => onToggleSashOpeningPicker(idx)}
+                                  />
+                                ) : (
+                                  <PickerField
+                                    variant="select"
+                                    label={t("calculator.sashOpening")}
+                                    active={false}
+                                    value={t("calculator.openingTypes.turn")}
+                                    onPress={() => {}}
+                                    disabled
+                                  />
+                                )}
                               </View>
                             </View>
 
-                            {sash.opening !== "fixed" ? (
-                              <View style={styles.field}>
-                                <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>
-                                  {t("calculator.handleSide")}
-                                </Text>
-                                <SegmentedControl
-                                  value={(sash.handleSide ?? "right") as HandleSide}
-                                  onChange={(next) =>
-                                    setWindowSashes((prev) =>
-                                      prev.map((item, i) =>
-                                        i === idx ? { ...item, handleSide: next as HandleSide } : item
-                                      )
-                                    )
-                                  }
-                                  options={[
-                                    { value: "left" as HandleSide, label: t("calculator.handleSides.left") },
-                                    { value: "right" as HandleSide, label: t("calculator.handleSides.right") },
-                                  ]}
-                                />
-                              </View>
-                            ) : null}
+
                           </>
                         ) : null}
                       </View>
@@ -1528,20 +2279,7 @@ export function CalculatorScreen(): JSX.Element {
                   })}
                 </View>
 
-                {meetingPairEligible ? (
-                  <SwitchField
-                    label={t("calculator.meetingPairNoMullion")}
-                    labelRightSlot={
-                      <HelpIcon
-                        onPress={() => setHelpKey("meetingPairNoMullion")}
-                        accessibilityLabel={t("calculator.meetingPairNoMullion")}
-                      />
-                    }
-                    value={windowMeetingPairNoMullion}
-                    valueText={windowMeetingPairNoMullion ? t("common.yes") : t("common.no")}
-                    onChange={setWindowMeetingPairNoMullion}
-                  />
-                ) : null}
+
 
                 {draftCalcDto?.issues.errors.length ? (
                   <Text style={[styles.validationText, { color: theme.colors.danger }]}>
@@ -1555,36 +2293,53 @@ export function CalculatorScreen(): JSX.Element {
               </View>
             ) : null}
 
-            {productType === "door" ? (
+            {productType === "door" || productType === "balconyBlock" ? (
               <View style={styles.field}>
-                <Text style={[styles.subSectionTitle, { color: theme.colors.text }]}>{t("calculator.sectionEntrance")}</Text>
-
-                <View style={styles.field}>
-                  <FieldLabel text={t("calculator.entrance.fillTop")} helpId="entranceFillType" />
-                  <SegmentedControl
-                    value={doorFillTop}
-                    onChange={setDoorFillTop}
-                    options={[
-                      { value: "glass", label: t("calculator.entrance.fillTypes.glass") },
-                      { value: "sandwich", label: t("calculator.entrance.fillTypes.sandwich") }
-                    ]}
+                <View
+                  ref={doorFillDropdownAnchorRef}
+                  style={styles.designDropdownAnchor}
+                  onLayout={(event) => {
+                    const next = Math.round(event.nativeEvent.layout.height);
+                    if (next > 0 && next !== doorFillPickerAnchorHeight) {
+                      setDoorFillPickerAnchorHeight(next);
+                    }
+                    if (doorFillPickerOpen) {
+                      requestAnimationFrame(() => {
+                        measureDoorFillPickerAnchor();
+                      });
+                    }
+                  }}
+                >
+                  <PickerField
+                    variant="select"
+                    label={t("calculator.entrance.fillType")}
+                    labelRightSlot={<HelpIcon onPress={() => setHelpKey("entranceFillType")} accessibilityLabel={t("calculator.entrance.fillType")} />}
+                    active={doorFillPickerOpen}
+                    rightSlot={
+                      <Ionicons
+                        name={doorFillPickerOpen ? "chevron-up" : "chevron-down"}
+                        size={18}
+                        color={theme.colors.textMuted}
+                      />
+                    }
+                    value={selectedDoorFillOption?.label}
+                    onPress={onToggleDoorFillPicker}
                   />
                 </View>
-
-                <View style={styles.field}>
-                  <FieldLabel text={t("calculator.entrance.fillBottom")} helpId="entranceFillType" />
-                  <SegmentedControl
-                    value={doorFillBottom}
-                    onChange={setDoorFillBottom}
-                    options={[
-                      { value: "glass", label: t("calculator.entrance.fillTypes.glass") },
-                      { value: "sandwich", label: t("calculator.entrance.fillTypes.sandwich") }
-                    ]}
-                  />
-                </View>
-
               </View>
             ) : null}
+
+            <View style={styles.field}>
+              <StepperField
+                label={t("calculator.quantity")}
+                value={quantity}
+                onChangeText={setQuantity}
+                min={1}
+                max={20}
+                step={1}
+                allowDirectEdit
+              />
+            </View>
           </View>
         );
 
@@ -1610,63 +2365,51 @@ export function CalculatorScreen(): JSX.Element {
                       expanded={expandedProfileBrand === brand}
                       onExpandedChange={(next) => setExpandedProfileBrand(next ? brand : null)}
                     >
-                    <View style={styles.profileModelGrid}>
-                      {items.map((item) => {
-                        const selected = selectedProfileModel?.key === item.key;
-                        const metaParts = [
-                          item.depthMm ? `${item.depthMm} мм` : null,
-                          item.chambers ? `${item.chambers} ${t("calculator.profileChambersShort")}` : null,
-                          item.thermalCoefficient ? `${t("calculator.profileThermalShort")} ${item.thermalCoefficient}` : null,
-                        ].filter(Boolean);
+                      <View style={styles.profileModelGrid}>
+                        {items.map((item) => {
+                          const selected = selectedProfileModel?.key === item.key;
+                          const metaParts = [
+                            item.depthMm ? `${item.depthMm} мм` : null,
+                            item.chambers ? `${item.chambers} ${t("calculator.profileChambersShort")}` : null,
+                            item.thermalCoefficient ? `${t("calculator.profileThermalShort")} ${item.thermalCoefficient}` : null,
+                          ].filter(Boolean);
 
-                        return (
-                          <Pressable
-                            key={item.key}
-                            accessibilityRole="button"
-                            accessibilityState={{ selected }}
-                            onPress={() => setProfileModel(item.key)}
-                            style={({ pressed }) => [
-                              styles.profileModelCard,
-                              {
-                                borderColor: selected ? theme.colors.primary : theme.colors.border,
-                                backgroundColor: selected ? theme.colors.primarySoft : theme.colors.surface,
-                              },
-                              pressed ? styles.profileModelCardPressed : null,
-                            ]}
-                          >
-                            <Text style={[styles.profileModelTitle, { color: selected ? theme.colors.primary : theme.colors.text }]}>
-                              {item.label}
-                            </Text>
-                            {metaParts.length ? (
-                              <Text style={[styles.profileModelMeta, { color: theme.colors.textMuted }]}>
-                                {metaParts.join(" · ")}
+                          return (
+                            <Pressable
+                              key={item.key}
+                              accessibilityRole="button"
+                              accessibilityState={{ selected }}
+                              onPress={() => setProfileModel(item.key)}
+                              style={({ pressed }) => [
+                                styles.profileModelCard,
+                                {
+                                  borderColor: selected ? theme.colors.primary : theme.colors.border,
+                                  backgroundColor: selected ? theme.colors.primarySoft : theme.colors.surface,
+                                },
+                                pressed ? styles.profileModelCardPressed : null,
+                              ]}
+                            >
+                              <Text style={[styles.profileModelTitle, { color: selected ? theme.colors.primary : theme.colors.text }]}>
+                                {item.label}
                               </Text>
-                            ) : null}
-                            {item.description ? (
-                              <Text style={[styles.profileModelDescription, { color: theme.colors.textMuted }]} numberOfLines={3}>
-                                {item.description}
-                              </Text>
-                            ) : null}
-                          </Pressable>
-                        );
-                      })}
-                    </View>
+                              {metaParts.length ? (
+                                <Text style={[styles.profileModelMeta, { color: theme.colors.textMuted }]}>
+                                  {metaParts.join(" · ")}
+                                </Text>
+                              ) : null}
+                              {item.description ? (
+                                <Text style={[styles.profileModelDescription, { color: theme.colors.textMuted }]} numberOfLines={3}>
+                                  {item.description}
+                                </Text>
+                              ) : null}
+                            </Pressable>
+                          );
+                        })}
+                      </View>
                     </CollapsibleSection>
                   ))}
                 </View>
               </View>
-            </View>
-          );
-        }
-
-      case "glazing":
-        {
-          const glazingIllustrationTitle = `${t("calculator.sectionGlazing")}: ${t(`calculator.glazingOptions.${glazing}`)}`;
-          const glazingIllustration = glazingPreview[glazing];
-
-          return (
-            <View style={styles.field}>
-              <CalcIllustrationCard title={glazingIllustrationTitle} source={glazingIllustration} />
 
               <View style={styles.field}>
                 <FieldLabel text={t("calculator.glazing")} helpId="glazing" />
@@ -1680,130 +2423,150 @@ export function CalculatorScreen(): JSX.Element {
                 />
               </View>
 
-              <View style={styles.field}>
-                <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>{t("calculator.glassOptionType")}</Text>
-                <SegmentedControl
-                  value={selectedGlassOption}
-                  onChange={setSelectedGlassOption}
-                  labelNumberOfLines={2}
-                  options={pricedGlassOptionItems}
+              <View
+                ref={glassOptionDropdownAnchorRef}
+                style={styles.designDropdownAnchor}
+                onLayout={(event) => {
+                  const next = Math.round(event.nativeEvent.layout.height);
+                  if (next > 0 && next !== glassOptionPickerAnchorHeight) {
+                    setGlassOptionPickerAnchorHeight(next);
+                  }
+                  if (glassOptionPickerOpen) {
+                    requestAnimationFrame(() => {
+                      measureGlassOptionPickerAnchor();
+                    });
+                  }
+                }}
+              >
+                <PickerField
+                  variant="select"
+                  label={t("calculator.glassOptionType")}
+                  active={glassOptionPickerOpen}
+                  leftSlot={<Ionicons name="cube-outline" size={ICON_SIZE.md} color={theme.colors.primary} />}
+                  rightSlot={
+                    <Ionicons
+                      name={glassOptionPickerOpen ? "chevron-up" : "chevron-down"}
+                      size={18}
+                      color={theme.colors.textMuted}
+                    />
+                  }
+                  value={pricedGlassOptionItems.find((item) => item.value === selectedGlassOption)?.label || ""}
+                  onPress={onToggleGlassOptionPicker}
                 />
               </View>
             </View>
           );
         }
 
-      case "design":
+      case "options":
         {
           const showColorPicker = designOption !== "none";
           const designIllustrationTitle = `${t("calculator.sectionDesign")}: ${designSummaryValue}`;
           const designIllustration = designPreview[designOption];
 
           return (
-            <View style={styles.designSection}>
-              <View style={styles.field}>
-                <CalcIllustrationCard title={designIllustrationTitle} source={designIllustration} />
+            <View style={styles.field}>
+              <CalcIllustrationCard title={designIllustrationTitle} source={designIllustration} />
 
-                <View
-                  ref={designDropdownAnchorRef}
-                  style={styles.designDropdownAnchor}
-                  onLayout={(event) => {
-                    const next = Math.round(event.nativeEvent.layout.height);
-                    if (next > 0 && next !== designPickerAnchorHeight) {
-                      setDesignPickerAnchorHeight(next);
-                    }
-                    if (designPickerOpen) {
-                      requestAnimationFrame(() => {
-                        measureDesignPickerAnchor();
-                      });
-                    }
-                  }}
-                >
-                  <PickerField
-                    variant="select"
-                    label={t("calculator.sectionDesign")}
-                    labelRightSlot={<HelpIcon onPress={() => setHelpKey("lamination")} accessibilityLabel={t("calculator.sectionDesign")} />}
-                    active={designPickerOpen}
-                    leftSlot={<Ionicons name="color-wand-outline" size={ICON_SIZE.md} color={theme.colors.primary} />}
-                    rightSlot={
-                      <Ionicons
-                        name={designPickerOpen ? "chevron-up" : "chevron-down"}
-                        size={18}
-                        color={theme.colors.textMuted}
-                      />
-                    }
-                    value={selectedDesignOptionLabel}
-                    onPress={onToggleDesignPicker}
-                  />
-                </View>
-
-                {showColorPicker ? (
-                  <View style={styles.colorPicker}>
-                    <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>{t("calculator.laminationColor")}</Text>
-
-                    <View style={styles.colorGrid}>
-	                      {(
-	                        [
-		                          { key: "gold_oak", label: t("calculator.laminationColorOptions.goldOak"), source: laminationColorPreview.gold_oak },
-		                          { key: "grey_oak", label: t("calculator.laminationColorOptions.greyOak"), source: laminationColorPreview.grey_oak },
-		                          { key: "dark_oak", label: t("calculator.laminationColorOptions.darkOak"), source: laminationColorPreview.dark_oak },
-		                          { key: "other", label: t("calculator.laminationColorOptions.other"), source: undefined },
-		                        ] as const
-		                      ).map((opt) => {
-		                        const selected = opt.key === laminationColor;
-
-                        return (
-                          <Pressable
-                            key={opt.key}
-                            accessibilityRole="button"
-                            accessibilityState={{ selected }}
-                            onPress={() => setLaminationColor(opt.key)}
-                            style={(state) => [
-                              styles.colorCard,
-                              {
-                                borderColor: selected ? theme.colors.primary : theme.colors.border,
-                                backgroundColor: selected ? theme.colors.primarySoft : theme.colors.surface,
-                              },
-                              state.pressed ? styles.colorCardPressed : null,
-                            ]}
-                          >
-                            <View
-		                              style={[
-		                                styles.colorImageWrap,
-		                                { borderBottomColor: theme.colors.border, backgroundColor: theme.colors.surface }
-		                              ]}
-		                            >
-		                              {opt.source ? (
-		                                <Image source={opt.source} style={styles.colorImage} resizeMode="cover" />
-		                              ) : (
-		                                <View style={styles.colorPlaceholder}>
-		                                  <Ionicons name="color-palette-outline" size={28} color={theme.colors.textMuted} />
-		                                </View>
-		                              )}
-		                            </View>
-                            <View style={styles.colorLabelWrap}>
-                              <Text
-                                style={[styles.colorLabel, { color: selected ? theme.colors.primary : theme.colors.text }]}
-                                numberOfLines={2}
-                              >
-                                {opt.label}
-                              </Text>
-                            </View>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-
-                    {!laminationColor ? (
-                      <Text style={[styles.validationText, { color: theme.colors.danger }]}>
-                        {t("calculator.validation.selectLaminationColor")}
-                      </Text>
-                    ) : null}
-                  </View>
-                ) : null}
+              <View
+                ref={designDropdownAnchorRef}
+                style={styles.designDropdownAnchor}
+                onLayout={(event) => {
+                  const next = Math.round(event.nativeEvent.layout.height);
+                  if (next > 0 && next !== designPickerAnchorHeight) {
+                    setDesignPickerAnchorHeight(next);
+                  }
+                  if (designPickerOpen) {
+                    requestAnimationFrame(() => {
+                      measureDesignPickerAnchor();
+                    });
+                  }
+                }}
+              >
+                <PickerField
+                  variant="select"
+                  label={t("calculator.sectionDesign")}
+                  labelRightSlot={<HelpIcon onPress={() => setHelpKey("lamination")} accessibilityLabel={t("calculator.sectionDesign")} />}
+                  active={designPickerOpen}
+                  leftSlot={<Ionicons name="color-wand-outline" size={ICON_SIZE.md} color={theme.colors.primary} />}
+                  rightSlot={
+                    <Ionicons
+                      name={designPickerOpen ? "chevron-up" : "chevron-down"}
+                      size={18}
+                      color={theme.colors.textMuted}
+                    />
+                  }
+                  value={selectedDesignOptionLabel}
+                  onPress={onToggleDesignPicker}
+                />
               </View>
 
-              {productType === "window" ? (
+              {showColorPicker ? (
+                <View style={styles.colorPicker}>
+                  <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>{t("calculator.laminationColor")}</Text>
+
+                  <View style={styles.colorGrid}>
+                    {(
+                      [
+                        { key: "gold_oak", label: t("calculator.laminationColorOptions.goldOak"), source: laminationColorPreview.gold_oak },
+                        { key: "grey_oak", label: t("calculator.laminationColorOptions.greyOak"), source: laminationColorPreview.grey_oak },
+                        { key: "dark_oak", label: t("calculator.laminationColorOptions.darkOak"), source: laminationColorPreview.dark_oak },
+                        { key: "other", label: t("calculator.laminationColorOptions.other"), source: undefined },
+                      ] as const
+                    ).map((opt) => {
+                      const selected = opt.key === laminationColor;
+
+                      return (
+                        <Pressable
+                          key={opt.key}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected }}
+                          onPress={() => setLaminationColor(opt.key)}
+                          style={(state) => [
+                            styles.colorCard,
+                            {
+                              borderColor: selected ? theme.colors.primary : theme.colors.border,
+                              backgroundColor: selected ? theme.colors.primarySoft : theme.colors.surface,
+                            },
+                            state.pressed ? styles.colorCardPressed : null,
+                          ]}
+                        >
+                          <View
+                            style={[
+                              styles.colorImageWrap,
+                              { borderBottomColor: theme.colors.border, backgroundColor: theme.colors.surface }
+                            ]}
+                          >
+                            {opt.source ? (
+                              <Image source={opt.source} style={styles.colorImage} resizeMode="cover" />
+                            ) : (
+                              <View style={styles.colorPlaceholder}>
+                                <Ionicons name="color-palette-outline" size={28} color={theme.colors.textMuted} />
+                              </View>
+                            )}
+                          </View>
+                          <View style={styles.colorLabelWrap}>
+                            <Text
+                              style={[styles.colorLabel, { color: selected ? theme.colors.primary : theme.colors.text }]}
+                              numberOfLines={2}
+                            >
+                              {opt.label}
+                            </Text>
+                          </View>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+
+                  {!laminationColor ? (
+                    <Text style={[styles.validationText, { color: theme.colors.danger }]}>
+                      {t("calculator.validation.selectLaminationColor")}
+                    </Text>
+                  ) : null}
+                </View>
+              ) : null}
+
+              {productType === "window" || productType === "balconyBlock" ? (
                 <View style={[styles.grid, isWide ? styles.gridWide : null]}>
                   <View style={styles.gridItem}>
                     <View style={styles.field}>
@@ -1836,82 +2599,192 @@ export function CalculatorScreen(): JSX.Element {
                   </View>
                 </View>
               ) : null}
+
+              {productType === "window" || productType === "balconyBlock" ? (
+                <View style={styles.field}>
+                  <SwitchField
+                    label={t("calculator.extras.mosquitoNet")}
+                    value={mosquitoNet === "on"}
+                    valueText={optionDeltaText.mosquitoNet}
+                    onChange={(next) => setMosquitoNet(next ? "on" : "off")}
+                  />
+                  <SwitchField
+                    label={t("calculator.extras.windowSill")}
+                    value={windowSill === "on"}
+                    valueText={optionDeltaText.windowSill}
+                    onChange={(next) => setWindowSill(next ? "on" : "off")}
+                  />
+                  {windowSill === "on" ? (
+                    <RangeField
+                      label={t("calculator.extras.windowSillWidth")}
+                      value={windowSillWidthCm}
+                      onChangeText={setWindowSillWidthCm}
+                      min={5}
+                      max={50}
+                      step={1}
+                      unit="cm"
+                    />
+                  ) : null}
+                  <SwitchField
+                    label={t("calculator.extras.dripEdge")}
+                    value={dripEdge === "on"}
+                    valueText={optionDeltaText.dripEdge}
+                    onChange={(next) => setDripEdge(next ? "on" : "off")}
+                  />
+                  {dripEdge === "on" ? (
+                    <View style={styles.field}>
+                      <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>
+                        {t("calculator.extras.dripEdgeWidth")}
+                      </Text>
+                      <SegmentedControl
+                        value={dripEdgeWidthCm}
+                        onChange={setDripEdgeWidthCm}
+                        options={[
+                          { value: "6" as const, label: "6" },
+                          { value: "9" as const, label: "9" },
+                          { value: "11" as const, label: "11" },
+                          { value: "13" as const, label: "13" },
+                        ]}
+                      />
+                    </View>
+                  ) : null}
+                  <SwitchField
+                    label={t("calculator.extras.casing")}
+                    value={casing === "on"}
+                    valueText={optionDeltaText.casing}
+                    onChange={(next) => setCasing(next ? "on" : "off")}
+                  />
+                </View>
+              ) : null}
             </View>
           );
         }
 
-      case "extras":
-        if (productType !== "window") return null;
+      case "summary":
         return (
           <View style={styles.field}>
-            <SwitchField
-              label={t("calculator.extras.mosquitoNet")}
-              value={mosquitoNet === "on"}
-              valueText={optionDeltaText.mosquitoNet}
-              onChange={(next) => setMosquitoNet(next ? "on" : "off")}
-            />
-            <SwitchField
-              label={t("calculator.extras.windowSill")}
-              value={windowSill === "on"}
-              valueText={optionDeltaText.windowSill}
-              onChange={(next) => setWindowSill(next ? "on" : "off")}
-            />
-            {windowSill === "on" ? (
-              <RangeField
-                label={t("calculator.extras.windowSillWidth")}
-                value={windowSillWidthCm}
-                onChangeText={setWindowSillWidthCm}
-                min={5}
-                max={50}
-                step={1}
-                unit="cm"
-              />
-            ) : null}
-            <SwitchField
-              label={t("calculator.extras.dripEdge")}
-              value={dripEdge === "on"}
-              valueText={optionDeltaText.dripEdge}
-              onChange={(next) => setDripEdge(next ? "on" : "off")}
-            />
-            {dripEdge === "on" ? (
-              <View style={styles.field}>
-                <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>
-                  {t("calculator.extras.dripEdgeWidth")}
-                </Text>
-                <SegmentedControl
-                  value={dripEdgeWidthCm}
-                  onChange={setDripEdgeWidthCm}
-                  options={[
-                    { value: "6" as const, label: "6" },
-                    { value: "9" as const, label: "9" },
-                    { value: "11" as const, label: "11" },
-                    { value: "13" as const, label: "13" },
-                  ]}
-                />
+            <Text style={[styles.subSectionTitle, { color: theme.colors.text, marginBottom: spacing.xs }]}>
+              {t("calculator.summaryTitle", { defaultValue: "Параметры изделия" })}
+            </Text>
+
+            <View style={styles.orderTotalsWrap}>
+              <View style={styles.orderTotalsRow}>
+                <Text style={[styles.fieldLabel, { color: theme.colors.textMuted }]}>{t("calculator.productType")}</Text>
+                <Text style={[styles.accordionSectionValue, { color: theme.colors.text }]}>{typeValue}</Text>
               </View>
-            ) : null}
-            <SwitchField
-              label={t("calculator.extras.casing")}
-              value={casing === "on"}
-              valueText={optionDeltaText.casing}
-              onChange={(next) => setCasing(next ? "on" : "off")}
-            />
+              <View style={styles.orderTotalsRow}>
+                <Text style={[styles.fieldLabel, { color: theme.colors.textMuted }]}>{t("calculator.sectionDimensions")}</Text>
+                <Text style={[styles.accordionSectionValue, { color: theme.colors.text }]}>{sizeLabel} ({quantity} шт.)</Text>
+              </View>
+              <View style={styles.orderTotalsRow}>
+                <Text style={[styles.fieldLabel, { color: theme.colors.textMuted }]}>{t("calculator.sectionProfile")}</Text>
+                <Text style={[styles.accordionSectionValue, { color: theme.colors.text }]} numberOfLines={2}>{profileValue}</Text>
+              </View>
+              <View style={styles.orderTotalsRow}>
+                <Text style={[styles.fieldLabel, { color: theme.colors.textMuted }]}>{t("calculator.sectionGlazing")}</Text>
+                <Text style={[styles.accordionSectionValue, { color: theme.colors.text }]}>{glazingValue}</Text>
+              </View>
+              {designOption !== "none" ? (
+                <View style={styles.orderTotalsRow}>
+                  <Text style={[styles.fieldLabel, { color: theme.colors.textMuted }]}>{t("calculator.sectionDesign")}</Text>
+                  <Text style={[styles.accordionSectionValue, { color: theme.colors.text }]}>{designSummaryValue}</Text>
+                </View>
+              ) : null}
+              {(productType === "window" || productType === "balconyBlock") && extrasEnabledCount > 0 ? (
+                <View style={styles.orderTotalsRow}>
+                  <Text style={[styles.fieldLabel, { color: theme.colors.textMuted }]}>{t("calculator.sectionExtras")}</Text>
+                  <Text style={[styles.accordionSectionValue, { color: theme.colors.text }]}>{extrasValue} опц.</Text>
+                </View>
+              ) : null}
+            </View>
+
+            <Text style={[styles.subSectionTitle, { color: theme.colors.text, marginTop: spacing.md, marginBottom: spacing.xs }]}>
+              {t("calculator.breakdown.title", { defaultValue: "Состав сметы" })}
+            </Text>
+
+            <PriceBreakdownList breakdown={draftBreakdown} currency={currency} />
+
+            <Text style={[styles.disclaimer, { color: theme.colors.textMuted, marginTop: spacing.sm, textAlign: "center", fontStyle: "italic" }]}>
+              {t("calculator.disclaimer")}
+            </Text>
           </View>
         );
-
     }
   };
 
+  const currentStepTitle = useMemo(() => {
+    switch (activeEditorKey) {
+      case "construction":
+        return t("calculator.sectionConstruction");
+      case "profile":
+        return t("calculator.sectionProfile");
+      case "design":
+        return t("calculator.sectionDesign");
+      case "summary":
+        return t("calculator.summaryTitle", { defaultValue: "Итог" });
+      default:
+        return "";
+    }
+  }, [activeEditorKey, t]);
+
+  const tabsConfigList: Array<{ key: CalcTab; label: string; icon: IoniconName }> = [
+    { key: "construction", label: t("calculator.sectionConstruction"), icon: calculatorSectionIcon.construction },
+    { key: "profile", label: t("calculator.sectionProfile"), icon: calculatorSectionIcon.profile },
+    { key: "options", label: t("calculator.sectionExtras"), icon: calculatorSectionIcon.extras },
+    { key: "summary", label: t("calculator.summaryTitle", { defaultValue: "Итог" }), icon: "receipt-outline" },
+  ];
+
+  const tabSelectorHeader = (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{
+        flexDirection: "row",
+        gap: spacing.sm,
+        paddingHorizontal: spacing.xs,
+        paddingBottom: spacing.xs,
+      }}
+      style={{ marginBottom: spacing.xs }}
+    >
+      {tabsConfigList.map((tab) => {
+        const isActive = activeTab === tab.key;
+        return (
+          <Pressable
+            key={tab.key}
+            accessibilityRole="button"
+            onPress={() => setActiveTab(tab.key)}
+            style={({ pressed }) => [
+              {
+                flexDirection: "row",
+                alignItems: "center",
+                paddingVertical: spacing.sm - 2,
+                paddingHorizontal: spacing.md,
+                borderRadius: radius.md,
+                borderWidth: 1,
+                borderColor: isActive ? theme.colors.primary : theme.colors.border,
+                backgroundColor: isActive ? theme.colors.primarySoft : theme.colors.surface,
+                gap: 6,
+              },
+              pressed ? { opacity: 0.85 } : null,
+            ]}
+          >
+            <Ionicons name={tab.icon} size={16} color={isActive ? theme.colors.primary : theme.colors.textMuted} />
+            <Text style={{ fontSize: 13, ...font(isActive ? 800 : 700), color: isActive ? theme.colors.primary : theme.colors.text }}>
+              {tab.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  );
+
   const editorTabsBlock = (
     <View style={styles.editorTabsBlock}>
-      <SectionTabs
-        items={editorSections.map((section) => ({ key: section.key, label: section.title, icon: section.icon }))}
-        value={resolvedActiveEditorKey}
-        onValueChange={setActiveEditorKey}
-        desktopSingleRow
-      />
-      <Card variant="solid">
-        {renderEditorBody(resolvedActiveEditorKey)}
+      {tabSelectorHeader}
+      <Card variant="glass">
+        <Animated.View style={animatedStepStyle}>
+          {renderEditorBody(activeTab)}
+        </Animated.View>
       </Card>
     </View>
   );
@@ -1921,45 +2794,42 @@ export function CalculatorScreen(): JSX.Element {
 
   const previewCard = (
     <Card variant="solid" style={[styles.card, isDesktopWeb ? styles.cardCompact : null]}>
-      <View style={styles.cardTitleRow}>
-        <View style={[styles.cardTitleIcon, { backgroundColor: theme.colors.primarySoft }]}>
-          <Ionicons name={calculatorSectionIcon.preview} size={ICON_SIZE.md} color={theme.colors.primary} />
-        </View>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>{t("calculator.preview.title")}</Text>
-      </View>
-      <Text style={[styles.previewHint, { color: theme.colors.textMuted }]}>{t("calculator.preview.hint")}</Text>
+
       <ProductPreview
         kind={productType}
         widthCm={Number(width)}
         heightCm={Number(height)}
-        canvasHeight={isDesktopWeb && productType === "window" ? 440 : undefined}
+        canvasHeight={isDesktopWeb && (productType === "window" || productType === "balconyBlock") ? 744 : 372}
         sashCount={Number(sashCount)}
         openingSashes={Number(openingSashes)}
         openingType={openingType}
         sashes={previewWindowSashes}
         doorSubtype={productType === "door" ? doorSubtype : undefined}
-        doorFillTop={productType === "door" ? doorFillTop : undefined}
-        doorFillBottom={productType === "door" ? doorFillBottom : undefined}
-        doorHandleSide={productType === "door" ? doorHandleSide : undefined}
+        doorFillTop={productType === "door" || productType === "balconyBlock" ? doorFillTop : undefined}
+        doorFillBottom={productType === "door" || productType === "balconyBlock" ? doorFillBottom : undefined}
+        doorHandleSide={productType === "door" || productType === "balconyBlock" ? doorHandleSide : undefined}
         profileDepthMm={selectedProfileModel?.depthMm ?? selectedProfileModel?.legacyDepthMm ?? 70}
         glazing={glazing}
         lamination={lamination}
         laminationGroup={laminationGroup}
         laminationColor={lamination !== "none" ? laminationColor : null}
-        decorBars={productType === "window" && decorBars === "on"}
+        decorBars={(productType === "window" || productType === "balconyBlock") && decorBars === "on"}
         decorBarsColor={decorBarsColor}
         glassOptions={calcInput.glassOptions}
+        onChangeWidthCm={setWidth}
+        onChangeHeightCm={setHeight}
+        onPressSash={(idx) => {
+          setActiveSashIndex(idx);
+          if (activeTab !== "construction") {
+            setActiveTab("construction");
+          }
+          requestAnimationFrame(() => {
+            onToggleSashOpeningPicker(idx);
+          });
+        }}
+        activeSashIndex={activeSashIndex}
       />
 
-      <View style={styles.previewChips}>
-        {previewChips.map((chip) => (
-          <PreviewChip key={chip.key} icon={chip.icon} label={chip.label} value={chip.value} />
-        ))}
-      </View>
-
-      <Text style={[styles.previewOptionsText, { color: theme.colors.textMuted }]}>
-        {t("calculator.preview.activeOptions")} <Text style={{ color: theme.colors.text }}>{activeOptionsText}</Text>
-      </Text>
     </Card>
   );
 
@@ -1993,16 +2863,195 @@ export function CalculatorScreen(): JSX.Element {
   const totalCard = (
     <Card
       variant="solid"
-      style={[styles.totalBlock, isDesktopWeb ? styles.totalBlockCompact : null, { backgroundColor: theme.colors.primarySoft }]}
+      style={[
+        styles.totalBlock,
+        isDesktopWeb ? styles.totalBlockCompact : null,
+        {
+          padding: 0,
+          borderWidth: 0,
+          overflow: "hidden",
+          backgroundColor: "transparent",
+        }
+      ]}
       elevated={false}
+      padded={false}
     >
-      <Text style={[styles.totalLabel, { color: theme.colors.textMuted }]}>{t("calculator.totalLabel")}</Text>
-      <Text style={[styles.totalValue, { color: theme.colors.primary }]}> 
-        {formatMoney(calculatedTotal ?? draftTotal, currency)}
-      </Text>
-      <PriceBreakdownList breakdown={draftBreakdown} currency={currency} style={styles.breakdownList} />
-      <Text style={[styles.disclaimer, { color: theme.colors.textMuted }]}>{t("calculator.disclaimer")}</Text>
+      <LinearGradient
+        colors={theme.isDark ? ["rgba(224, 94, 38, 0.22)", "rgba(194, 65, 12, 0.12)"] : ["rgba(255, 115, 22, 0.14)", "rgba(217, 82, 30, 0.05)"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{ padding: spacing.md }}
+      >
+        <Text style={[styles.totalLabel, { color: theme.colors.textMuted, fontSize: 13, marginBottom: 2 }]}>
+          {t("product.priceFrom")}
+        </Text>
+        <Text style={[styles.totalValue, { color: theme.colors.primary, fontSize: 28, lineHeight: 34 }]}> 
+          {formatMoney(calculatedTotal ?? draftTotal, currency)}
+        </Text>
+      </LinearGradient>
     </Card>
+  );
+
+  const isLastStep = activeTab === "summary";
+  const isFirstStep = activeTab === "construction";
+
+  const handleBack = () => {
+    const idx = tabsList.indexOf(activeTab);
+    if (idx > 0) {
+      setActiveTab(tabsList[idx - 1]);
+    }
+  };
+
+  const handleNext = () => {
+    if (activeTab === "options" && designOption !== "none" && !laminationColor) {
+      Alert.alert(t("calculator.title"), t("calculator.validation.selectLaminationColor"));
+      return;
+    }
+
+    const idx = tabsList.indexOf(activeTab);
+    if (idx < tabsList.length - 1) {
+      setActiveTab(tabsList[idx + 1]);
+    }
+  };
+
+  const isNextDisabled = useMemo(() => {
+    if (activeTab === "options" && designOption !== "none" && !laminationColor) {
+      return true;
+    }
+    if (draftCalcDto?.issues.errors.length) {
+      return true;
+    }
+    if (draftTotal <= 0) {
+      return true;
+    }
+    return false;
+  }, [activeTab, designOption, laminationColor, draftCalcDto, draftTotal]);
+
+  const isAddDisabled = useMemo(() => {
+    if (draftCalcDto?.issues.errors.length) {
+      return true;
+    }
+    if (designOption !== "none" && !laminationColor) {
+      return true;
+    }
+    if (draftTotal <= 0) {
+      return true;
+    }
+    if (orderItems.length >= 20) {
+      return true;
+    }
+    return false;
+  }, [draftCalcDto, designOption, laminationColor, draftTotal, orderItems.length]);
+
+  const actionControls = (isDesktop: boolean) => {
+    return (
+      <View style={[styles.actionControlsRow, isDesktop ? styles.actionControlsDesktop : null]}>
+        {!isFirstStep && (
+          <Pressable
+            accessibilityRole="button"
+            onPress={handleBack}
+            style={({ pressed }) => [
+              styles.backButton,
+              { borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
+              pressed ? styles.backButtonPressed : null
+            ]}
+          >
+            <Ionicons name="chevron-back" size={20} color={theme.colors.text} />
+            <Text style={[styles.backButtonText, { color: theme.colors.text }]}>
+              {t("common.back", { defaultValue: "Назад" })}
+            </Text>
+          </Pressable>
+        )}
+
+        {isLastStep ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={onAddToOrder}
+            disabled={isAddDisabled}
+            style={({ pressed }) => [
+              styles.primaryActionButton,
+              { backgroundColor: theme.colors.success },
+              isAddDisabled ? styles.actionButtonDisabled : null,
+              pressed ? styles.actionButtonPressed : null
+            ]}
+          >
+            <Ionicons name="cart-outline" size={20} color="#FFFFFF" />
+            <Text style={styles.primaryActionButtonText}>
+              {t("calculator.addToOrder", { defaultValue: "В заказ" })}
+            </Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            onPress={handleNext}
+            disabled={isNextDisabled}
+            style={({ pressed }) => [
+              styles.primaryActionButton,
+              { backgroundColor: theme.colors.primary },
+              isNextDisabled ? styles.actionButtonDisabled : null,
+              pressed ? styles.actionButtonPressed : null
+            ]}
+          >
+            <Text style={styles.primaryActionButtonText}>
+              {t("common.next", { defaultValue: "Далее" })}
+            </Text>
+            <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
+          </Pressable>
+        )}
+      </View>
+    );
+  };
+
+  const livePriceBlock = (isDesktop: boolean) => {
+    return (
+      <Card
+        variant="solid"
+        style={[
+          styles.totalBlock,
+          isDesktop ? styles.totalBlockCompact : null,
+          {
+            padding: 0,
+            borderWidth: 0,
+            overflow: "hidden",
+            backgroundColor: "transparent",
+            flex: isDesktop ? undefined : 1,
+          }
+        ]}
+        elevated={false}
+        padded={false}
+      >
+        <LinearGradient
+          colors={theme.isDark ? ["rgba(224, 94, 38, 0.22)", "rgba(194, 65, 12, 0.12)"] : ["rgba(255, 115, 22, 0.14)", "rgba(217, 82, 30, 0.05)"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{ paddingVertical: spacing.sm, paddingHorizontal: spacing.md, justifyContent: "center" }}
+        >
+          <Text style={[styles.totalLabel, { color: theme.colors.textMuted, fontSize: 11, marginBottom: 1 }]}>
+            {t("product.priceFrom")}
+          </Text>
+          <Text style={[styles.totalValue, { color: theme.colors.primary, fontSize: 22, lineHeight: 26, ...font(800) }]}>
+            {formatMoney(draftTotal, currency)}
+          </Text>
+        </LinearGradient>
+      </Card>
+    );
+  };
+
+  const mobileStickyBottomBar = (
+    <View
+      style={[
+        styles.mobileStickyBottomBar,
+        {
+          backgroundColor: theme.colors.surface,
+          borderTopColor: theme.colors.border,
+        }
+      ]}
+    >
+      <View style={styles.mobileStickyBottomBarInner}>
+        {livePriceBlock(false)}
+        {actionControls(false)}
+      </View>
+    </View>
   );
 
 	  return (
@@ -2034,13 +3083,8 @@ export function CalculatorScreen(): JSX.Element {
 	                        ]}
 	                      >
 	                        {previewCard}
-	                        {!hasCalculated ? calculateButton : null}
-	                        {hasCalculated ? (
-	                          <>
-	                            {totalCard}
-	                            {addToCartButton}
-	                          </>
-	                        ) : null}
+	                        {livePriceBlock(true)}
+	                        {actionControls(true)}
 	                      </View>
 	                    </View>
 
@@ -2052,18 +3096,7 @@ export function CalculatorScreen(): JSX.Element {
 	              ) : (
                 <>
                   <View style={desktopContent}>{previewCard}</View>
-
                   <View style={desktopContent}>{editorTabsBlock}</View>
-
-
-                  {!hasCalculated ? <View style={desktopContent}>{calculateButton}</View> : null}
-
-                  {hasCalculated ? (
-                    <>
-                      <View style={desktopContent}>{totalCard}</View>
-                      <View style={desktopContent}>{addToCartButton}</View>
-                    </>
-                  ) : null}
                 </>
               )}
 
@@ -2071,6 +3104,67 @@ export function CalculatorScreen(): JSX.Element {
 	                <SiteFooter gutter={spacing.md} />
 	              </View>
 	        </AppScrollView>
+          {!isDesktopWeb ? mobileStickyBottomBar : null}
+          <SelectListModal
+            mounted={productTypePickerMounted}
+            open={productTypePickerOpen}
+            onClose={() => setProductTypePickerOpen(false)}
+            options={productTypeOptionItems}
+            value={productType}
+            onSelect={(next) => {
+              setProductType(next as any);
+              setProductTypePickerOpen(false);
+            }}
+            top={productTypeMenuTop}
+            left={productTypeMenuLeft}
+            width={productTypeMenuWidth}
+            maxHeight={productTypeMenuMaxHeight}
+            animatedStyle={productTypePickerAnimatedStyle}
+            showVerticalScrollIndicator={productTypeOptionItems.length > 5}
+          />
+          <SelectListModal
+            mounted={doorSubtypePickerMounted}
+            open={doorSubtypePickerOpen}
+            onClose={() => setDoorSubtypePickerOpen(false)}
+            options={doorSubtypeOptionItems}
+            value={doorSubtype}
+            onSelect={(next) => {
+              setDoorSubtype(next as any);
+              setDoorSubtypePickerOpen(false);
+            }}
+            top={doorSubtypeMenuTop}
+            left={doorSubtypeMenuLeft}
+            width={doorSubtypeMenuWidth}
+            maxHeight={doorSubtypeMenuMaxHeight}
+            animatedStyle={doorSubtypePickerAnimatedStyle}
+            showVerticalScrollIndicator={doorSubtypeOptionItems.length > 5}
+          />
+          <SelectListModal
+            mounted={doorFillPickerMounted}
+            open={doorFillPickerOpen}
+            onClose={() => setDoorFillPickerOpen(false)}
+            options={doorFillOptionItems}
+            value={doorFill}
+            onSelect={(next) => {
+              if (next === "glass") {
+                setDoorFillTop("glass");
+                setDoorFillBottom("glass");
+              } else if (next === "sandwich") {
+                setDoorFillTop("sandwich");
+                setDoorFillBottom("sandwich");
+              } else if (next === "combined") {
+                setDoorFillTop("glass");
+                setDoorFillBottom("sandwich");
+              }
+              setDoorFillPickerOpen(false);
+            }}
+            top={doorFillMenuTop}
+            left={doorFillMenuLeft}
+            width={doorFillMenuWidth}
+            maxHeight={doorFillMenuMaxHeight}
+            animatedStyle={doorFillPickerAnimatedStyle}
+            showVerticalScrollIndicator={doorFillOptionItems.length > 5}
+          />
           <SelectListModal
             mounted={designPickerMounted}
             open={designPickerOpen}
@@ -2106,6 +3200,40 @@ export function CalculatorScreen(): JSX.Element {
             maxHeight={sashOpeningMenuMaxHeight}
             animatedStyle={sashOpeningPickerAnimatedStyle}
           />
+          <SelectListModal
+            mounted={glassOptionPickerMounted}
+            open={glassOptionPickerOpen}
+            onClose={() => setGlassOptionPickerOpen(false)}
+            options={pricedGlassOptionItems}
+            value={selectedGlassOption}
+            onSelect={(next) => {
+              setSelectedGlassOption(next as any);
+              setGlassOptionPickerOpen(false);
+            }}
+            top={glassOptionMenuTop}
+            left={glassOptionMenuLeft}
+            width={glassOptionMenuWidth}
+            maxHeight={glassOptionMenuMaxHeight}
+            animatedStyle={glassOptionPickerAnimatedStyle}
+            showVerticalScrollIndicator={pricedGlassOptionItems.length > 5}
+          />
+          <SelectListModal
+            mounted={sashCountPickerMounted}
+            open={sashCountPickerOpen}
+            onClose={() => setSashCountPickerOpen(false)}
+            options={sashCountOptionItems}
+            value={sashCount}
+            onSelect={(next) => {
+              setSashCount(next as SashCount);
+              setSashCountPickerOpen(false);
+            }}
+            top={sashCountMenuTop}
+            left={sashCountMenuLeft}
+            width={sashCountMenuWidth}
+            maxHeight={sashCountMenuMaxHeight}
+            animatedStyle={sashCountPickerAnimatedStyle}
+            showVerticalScrollIndicator={sashCountOptionItems.length > 5}
+          />
 	        <HelpModal
 	          open={helpKey !== null}
 	          title={helpTitle}
@@ -2122,11 +3250,118 @@ const styles = StyleSheet.create({
   container: {
     padding: spacing.md,
     gap: spacing.md,
-    paddingBottom: 0
+    paddingBottom: 84
   },
   containerDesktop: {
     padding: spacing.sm,
-    gap: spacing.sm
+    gap: spacing.sm,
+    paddingBottom: 0
+  },
+  progressHeaderContainer: {
+    paddingHorizontal: spacing.xs,
+    marginBottom: spacing.xs,
+    gap: spacing.xs,
+  },
+  progressLabelRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+  },
+  progressSubtitle: {
+    ...font(700),
+    fontSize: 12,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+  },
+  progressTitle: {
+    ...font(900),
+    fontSize: 16,
+  },
+  progressBarRow: {
+    flexDirection: "row",
+    height: 6,
+    gap: 6,
+    alignItems: "center",
+    width: "100%",
+    marginTop: 4,
+  },
+  progressBarSegment: {
+    flex: 1,
+    height: "100%",
+    borderRadius: 3,
+    ...( { cursor: "pointer" } as object ),
+  },
+  progressBarSegmentActive: {},
+  mobileStickyBottomBar: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    borderTopWidth: 1,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 16,
+    zIndex: 99,
+  },
+  mobileStickyBottomBarInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+  },
+  actionControlsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  actionControlsDesktop: {
+    width: "100%",
+    marginTop: spacing.xs,
+  },
+  backButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    height: 46,
+    paddingHorizontal: spacing.md,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 4,
+    ...( { cursor: "pointer" } as object )
+  },
+  backButtonPressed: {
+    opacity: 0.8,
+  },
+  backButtonText: {
+    ...font(700),
+    fontSize: 14,
+  },
+  primaryActionButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    height: 46,
+    paddingHorizontal: spacing.md,
+    borderRadius: 12,
+    gap: 6,
+    minWidth: 110,
+    ...( { cursor: "pointer" } as object )
+  },
+  actionButtonPressed: {
+    opacity: 0.9,
+  },
+  actionButtonDisabled: {
+    opacity: 0.5,
+  },
+  primaryActionButtonText: {
+    color: "#FFFFFF",
+    ...font(800),
+    fontSize: 14,
   },
   desktopContent: {
     width: "100%",

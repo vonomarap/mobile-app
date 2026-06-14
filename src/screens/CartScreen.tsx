@@ -1,6 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useMutation } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Alert, Platform, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { useTranslation } from "react-i18next";
 import { AppScrollView } from "../components/AppScrollView";
@@ -10,12 +9,10 @@ import { PriceBreakdownList } from "../components/PriceBreakdownList";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { ScreenHeader } from "../components/ScreenHeader";
-import { TextField } from "../components/TextField";
 import { RootStackParamList } from "../navigation/types";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCart } from "../services/cart-context";
-import { applyPromoCode } from "../services/quotes";
 import { useCurrencyControls } from "../services/currency-context";
 import { spacing } from "../theme/tokens";
 import { useTheme } from "../theme/ThemeProvider";
@@ -32,35 +29,13 @@ export function CartScreen(): JSX.Element {
   const desktopContent = isDesktopWeb ? styles.desktopContent : null;
 
   const { currency } = useCurrencyControls();
-  const { ready, items, promoCode, setPromoCode, removeItem, clear, itemsSubtotal } = useCart();
+  const { ready, items, removeItem, clear, itemsSubtotal, volumeDiscount } = useCart();
 
-  const [promoPreview, setPromoPreview] = useState<number | null>(null);
-  const promoMutation = useMutation({ mutationFn: applyPromoCode });
-
-  const total = promoPreview ?? itemsSubtotal;
+  const total = volumeDiscount.afterDiscount;
   const breakdown = useMemo(
     () => buildQuoteBreakdown(items.map((item) => item.preview?.calcDto), Math.max(0, itemsSubtotal - total)),
     [items, itemsSubtotal, total]
   );
-
-  const onApplyPromo = async () => {
-    if (!promoCode.trim()) return;
-    if (itemsSubtotal <= 0) {
-      Alert.alert(
-        t("cart.title", { defaultValue: "Корзина" }),
-        t("calculator.validation.addAtLeastOneItem", { defaultValue: "Добавьте хотя бы одно изделие в заказ." })
-      );
-      return;
-    }
-
-    try {
-      const result = await promoMutation.mutateAsync({ code: promoCode.trim(), total: itemsSubtotal, currency });
-      setPromoPreview(result.finalTotal);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Promo check failed";
-      Alert.alert(t("calculator.promoTitle"), message);
-    }
-  };
 
   const onCheckout = () => {
     if (!items.length) {
@@ -74,7 +49,6 @@ export function CartScreen(): JSX.Element {
     navigation.navigate("QuoteRequest", {
       orderItems: items,
       currency,
-      promoCode: promoCode.trim() ? promoCode.trim().toUpperCase() : null,
       previewTotal: total,
     });
   };
@@ -82,7 +56,6 @@ export function CartScreen(): JSX.Element {
   const onClear = () => {
     if (!items.length) return;
     clear();
-    setPromoPreview(null);
   };
 
   const orderMetaText = useMemo(
@@ -108,7 +81,6 @@ export function CartScreen(): JSX.Element {
           <View style={desktopContent}>
             <ScreenHeader
               title={t("cart.title", { defaultValue: "Корзина" })}
-              subtitle={t("cart.subtitle", { defaultValue: "Изделия для общей заявки" })}
             />
           </View>
 
@@ -168,7 +140,6 @@ export function CartScreen(): JSX.Element {
                             tooltip={t("calculator.removeFromOrder", { defaultValue: "Удалить позицию" })}
                             onPress={() => {
                               removeItem(item.localId);
-                              setPromoPreview(null);
                             }}
                             tone="soft"
                             size={34}
@@ -194,57 +165,13 @@ export function CartScreen(): JSX.Element {
                   {formatMoney(itemsSubtotal, currency)}
                 </Text>
               </View>
-            </Card>
-          </View>
 
-          <View style={desktopContent}>
-            <Card variant="solid" style={styles.card}>
-              <View style={styles.cardTitleRow}>
-                <View style={styles.cardTitleMain}>
-                  <View style={[styles.cardTitleIcon, { backgroundColor: theme.colors.primarySoft }]}>
-                    <Ionicons name="pricetag-outline" size={18} color={theme.colors.primary} />
-                  </View>
-                  <Text style={[styles.sectionTitle, { color: theme.colors.text }]}> 
-                    {t("calculator.sectionPromo")}
-                  </Text>
-                </View>
-              </View>
-
-              <TextField
-                label={t("calculator.promo")}
-                value={promoCode}
-                onChangeText={(next) => {
-                  setPromoCode(next);
-                  setPromoPreview(null);
-                }}
-                autoCapitalize="characters"
-                autoCorrect={false}
-                placeholder={t("calculator.promoPlaceholder")}
-              />
-
-              <PrimaryButton
-                title={t("calculator.promoApply")}
-                tone="soft"
-                onPress={() => void onApplyPromo()}
-                loading={promoMutation.isPending}
-                disabled={!promoCode.trim() || promoMutation.isPending || !items.length}
-                leftSlot={<Ionicons name="checkmark-outline" size={18} color={theme.colors.primary} />}
-              />
-
-              <View style={[styles.totalWrap, { borderTopColor: theme.colors.border }]}> 
-                <Text style={[styles.totalLabel, { color: theme.colors.textMuted }]}> 
-                  {t("calculator.totalLabel")}
-                </Text>
-                <Text style={[styles.totalValue, { color: theme.colors.primary }]}> 
-                  {formatMoney(total, currency)}
+              <View style={styles.totalWrap}>
+                <View />
+                <Text style={[styles.totalValue, { color: theme.colors.primary }]}>
+                  {t("product.priceFrom")} {formatMoney(total, currency)}
                 </Text>
               </View>
-              <PriceBreakdownList breakdown={breakdown} currency={currency} style={styles.breakdownList} />
-              <Text style={[styles.disclaimer, { color: theme.colors.textMuted }]}>{t("calculator.disclaimer")}</Text>
-
-              {promoPreview !== null ? (
-                <Text style={[styles.promoNote, { color: theme.colors.textMuted }]}>{t("calculator.promoApplied")}</Text>
-              ) : null}
             </Card>
           </View>
 
@@ -373,14 +300,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
-  promoNote: {
-    fontSize: 12,
-  },
+
   breakdownList: {
     marginTop: spacing.xs,
   },
   disclaimer: {
     fontSize: 12,
     lineHeight: 18,
+  },
+  volumeDiscountInfo: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "600",
+  },
+  nextTierHint: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontStyle: "italic",
   },
 });

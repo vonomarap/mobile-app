@@ -13,7 +13,7 @@ import { fetchSiteSettings } from "../services/site-settings";
 import { font } from "../theme/font";
 import { radius, spacing } from "../theme/tokens";
 import { useTheme } from "../theme/ThemeProvider";
-import { buildExternalUrl, buildMailtoUrl, buildPhoneUrl, buildTelegramUrl, buildWhatsAppUrl, formatTelegramValue } from "../utils/contact-links";
+import { buildExternalUrl, buildMailtoUrl, buildPhoneUrl, buildTelegramUrl, formatTelegramValue } from "../utils/contact-links";
 
 const SUPPORT_TELEGRAM_USERNAME = "kanokna_support_bot";
 const SUPPORT_TELEGRAM_FALLBACK = `${SUPPORT_TELEGRAM_USERNAME}?start=site`;
@@ -167,8 +167,6 @@ export function ContactsScreen(): JSX.Element {
   const phoneUrl = phoneRaw ? buildPhoneUrl(phoneRaw) : "";
   const emailRaw = (settings.email ?? "").trim();
   const emailUrl = emailRaw ? buildMailtoUrl(emailRaw) : "";
-  const whatsappRaw = (settings.whatsapp ?? "").trim();
-  const whatsappUrl = whatsappRaw ? buildWhatsAppUrl(whatsappRaw) : "";
   const telegramSource = (settings.telegram ?? "").trim();
   const telegramLinkSource = telegramSource || SUPPORT_TELEGRAM_FALLBACK;
   const telegramRaw = telegramSource ? formatTelegramValue(telegramSource) : `@${SUPPORT_TELEGRAM_USERNAME}`;
@@ -203,15 +201,6 @@ export function ContactsScreen(): JSX.Element {
   ].filter((item): item is ContactAction => Boolean(item));
 
   const messengerContacts = [
-    whatsappUrl
-      ? {
-          key: "whatsapp",
-          title: t("contacts.whatsapp"),
-          value: whatsappRaw,
-          renderIcon: (active: boolean) => <FontAwesome name="whatsapp" size={18} color={active ? "#25D366" : mutedIconColor} />,
-          onPress: () => openExternalUrl(whatsappUrl),
-        }
-      : null,
     telegramUrl
       ? {
           key: "telegram",

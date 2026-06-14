@@ -1,8 +1,5 @@
 import type { CalcInput, CalcResultDTO } from "../utils/calc";
 
-export const HELP_SECTION_KEYS = ["order", "measurement", "profiles", "installation", "repair", "contact"] as const;
-export type HelpSectionKey = (typeof HELP_SECTION_KEYS)[number];
-
 export type QuoteOrderItemPreview = {
   subtotal: number;
   total: number;
@@ -10,11 +7,14 @@ export type QuoteOrderItemPreview = {
   calcDto?: CalcResultDTO;
 };
 
+export type MoskitkiScreenType = "standard" | "anticat" | "antimidges";
+
 export type QuoteMoskitkiDraftData = {
   widthMm: number;
   heightMm: number;
   quantity: number;
   pricePerItem: number;
+  screenType?: MoskitkiScreenType;
   title?: string;
 };
 
@@ -35,15 +35,15 @@ export type QuoteMoskitkiOrderItemDraft = {
 export type QuoteOrderItemDraft = QuoteCalcOrderItemDraft | QuoteMoskitkiOrderItemDraft;
 
 export type RootStackParamList = {
-  Faq: { section?: HelpSectionKey } | undefined;
+  Home: undefined;
   Moskitki: undefined;
   Catalog: undefined;
   Gallery: undefined;
-  Calculator: { presetProductType?: "window" | "door" } | undefined;
+  Calculator: { presetProductType?: "window" | "door" | "balconyBlock" } | undefined;
   Cart: undefined;
   Contacts: undefined;
   SupportChat: undefined;
-  QuoteRequest: { orderItems: QuoteOrderItemDraft[]; currency: string; promoCode?: string | null; previewTotal?: number };
+  QuoteRequest: { orderItems: QuoteOrderItemDraft[]; currency: string; previewTotal?: number; volumeDiscountAmount?: number };
   Account: undefined;
   Quotes: undefined;
   QuoteDetails: { quoteId: string };

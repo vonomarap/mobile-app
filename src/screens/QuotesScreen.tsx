@@ -83,7 +83,9 @@ export function QuotesScreen(): JSX.Element {
         ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
         ListHeaderComponent={
           <View style={styles.header}>
-            <ScreenHeader title={t("quotes.title")} subtitle={t("quotes.subtitle")} />
+            <View style={styles.headerWrap}>
+              <ScreenHeader title={t("quotes.title")} subtitle={t("quotes.subtitle")} />
+            </View>
           </View>
         }
         ListEmptyComponent={
@@ -105,7 +107,10 @@ const styles = StyleSheet.create({
     paddingBottom: 0
   },
   header: {
-    marginBottom: spacing.md
+    gap: spacing.xs
+  },
+  headerWrap: {
+    gap: spacing.xs
   },
   emptyWrap: {
     paddingVertical: spacing.xl

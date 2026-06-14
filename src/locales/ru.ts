@@ -25,6 +25,7 @@ export const ru = {
     }
   },
   tabs: {
+    home: "Главная",
     catalog: "Каталог",
     moskitki: "Москитки",
     gallery: "Портфолио",
@@ -392,11 +393,53 @@ export const ru = {
       contact: "Связь"
     },
     promosLink: "Акции",
-    regionTagline: "Окна, двери и комплектующие по Краснодарскому краю."
+    regionTagline: "Окна, двери и комплектующие."
+  },
+  home: {
+    hero: {
+      title: "Окна в Краснодарском крае",
+      subtitle: "Сайт официального представителя Фабрики Дышащих Окон в Каневском районе",
+      pill: "Окна · Двери · Москитки",
+      cta: "Рассчитать стоимость",
+      catalogCta: "Каталог"
+    },
+    nav: {
+      calc: "Калькулятор",
+      catalog: "Каталог товаров",
+      moskitki: "Москитные сетки"
+    },
+    gallery: {
+      title: "Наши работы",
+      seeAll: "Смотреть все"
+    },
+    benefits: {
+      warranty: "Гарантия",
+      warrantyDesc: "До 5 лет на продукцию и монтаж",
+      speed: "Быстрое изготовление",
+      speedDesc: "От 3 рабочих дней с момента замера",
+      delivery: "Доставка по краю",
+      deliveryDesc: "Краснодар и весь Краснодарский край",
+      install: "Монтаж под ключ",
+      installDesc: "Профессиональная установка с контролем качества",
+      supply: "Прямые поставки",
+      supplyDesc: "С производства без посредников",
+      original: "Оригинальные комплектующие",
+      originalDesc: "Сертифицированная продукция от производителя"
+    },
+    quote: {
+      title: "Нужна помощь?",
+      subtitle: "Оставьте телефон — перезвоним и подберём конфигурацию.",
+      phonePlaceholder: "+7 (___) ___-__-__",
+      submit: "Перезвоните мне",
+      submitting: "Отправка...",
+      successTitle: "Заявка отправлена",
+      successBody: "Мы перезвоним вам в ближайшее время.",
+      phoneRequired: "Введите номер телефона"
+    }
   },
   catalog: {
     title: "Каталог",
-    subtitle: "Окна, двери и комплектующие по Краснодарскому краю.",
+    subtitle: "Окна, двери и комплектующие.",
     searchPlaceholder: "Поиск по каталогу",
     empty: "Товары пока не добавлены",
     filters: {
@@ -430,7 +473,7 @@ export const ru = {
     notFound: "Товар не найден",
     notFoundHint: "Возможно, товар удален или скрыт из каталога.",
     backToCatalog: "Вернуться в каталог",
-    priceFrom: "От",
+    priceFrom: "от",
     priceOnRequest: "Цена по запросу",
     descriptionTitle: "Описание",
     emptyDescription: "Описание пока не добавлено.",
@@ -443,18 +486,18 @@ export const ru = {
   },
   gallery: {
     title: "Портфолио",
-    subtitle: "Примеры выполненных работ по Краснодарскому краю.",
+    subtitle: "Примеры выполненных работ.",
     empty: "Кейсы пока не добавлены"
   },
   calculator: {
     title: "Калькулятор",
-    subtitle: "Расчет стоимости и отправка заявки по Краснодарскому краю.",
+    subtitle: "Укажите конструкцию, размеры и комплектацию — калькулятор покажет предварительную стоимость без визита замерщика.",
     needAuth: "Войдите, чтобы отправить заявку",
     promoTitle: "Промокод",
     quoteTitle: "Заявка",
     preview: {
       title: "Предпросмотр",
-      hint: "Схема примерная. Итоговый вид может отличаться.",
+      hint: "Итоговый вид может отличаться.",
       activeOptions: "Активные опции:",
       none: "Нет",
       andMore: "+ ещё {{count}}",
@@ -481,7 +524,8 @@ export const ru = {
     productType: "Тип товара",
     types: {
       window: "Окно",
-      door: "Дверь"
+      door: "Дверь",
+      balconyBlock: "Балконный блок"
     },
     doorSubtype: "Тип двери",
     doorSubtypes: {
@@ -501,6 +545,17 @@ export const ru = {
     meetingPairNoMullion: "Без импоста (встречная пара)",
     sashOpening: "Открывание створки",
     sashCount: "Створок",
+    sashCounts: {
+      window: {
+        "1": "Одностворчатое окно",
+        "2": "Двустворчатое окно",
+        "3": "Трехстворчатое окно"
+      },
+      balconyBlock: {
+        "2": "Двустворчатый балконный блок",
+        "3": "Трехстворчатый балконный блок"
+      }
+    },
     openingSashes: "Открывающихся",
     openingType: "Открывание",
     openingTypes: {
@@ -593,7 +648,7 @@ export const ru = {
     orderEmpty: "Добавьте изделия, чтобы сформировать общий заказ.",
     orderItemAdded: "Позиция добавлена в заказ.",
     removeFromOrder: "Удалить позицию",
-    orderItemsCount: "Позиции: {{count}}",
+    orderItemsCount: "Изделий: {{count}}",
     itemsCountLabel: "Позиции",
     address: "Адрес",
     addressPlaceholder: "Район, населённый пункт",
@@ -601,12 +656,9 @@ export const ru = {
     municipalityPlaceholder: "Выберите район или округ",
     kanevskyPlace: "Населённый пункт",
     kanevskyPlacePlaceholder: "Выберите населённый пункт",
-    preferredDate: "Желаемая дата замера",
-    datePlaceholder: "Любая удобная дата",
-    calendarTitle: "Выберите дату замера",
     namePlaceholder: "Как к вам обращаться",
-    phonePlaceholder: "+7 999 123-45-67",
-    phoneHint: "Укажите код страны",
+    phonePlaceholder: "999 123-45-67",
+    phoneHint: "",
     emailPlaceholder: "name@example.com",
     validation: {
       nameRequired: "Введите имя",
@@ -618,8 +670,15 @@ export const ru = {
       maxOrderItems: "Максимум 20 изделий в одном заказе."
     },
     totalLabel: "Предварительная сумма",
+    summary: {
+      sizeLabel: "Размер",
+    },
     promoApplied: "С учетом промокода",
     disclaimer: "Предварительная стоимость. Точная цена после замера.",
+    volumeDiscountLabel: "Скидка за объём",
+    volumeDiscountPercent: "{{percent}}% за объём",
+    volumeNextTierFirst: "Добавьте ещё {{count}} изд. для скидки {{percent}}%",
+    volumeNextTierImprovement: "Добавьте ещё {{count}} изд. для скидки {{percent}}%",
     breakdown: {
       title: "Состав сметы",
       groups: {
@@ -675,12 +734,13 @@ export const ru = {
     done: "Заявка принята",
     successBody: "Спасибо! Мы свяжемся с вами в ближайшее время.",
     entrance: {
-      fillType: "Заполнение",
+      fillType: "Заполнение двери",
       fillTop: "Верх двери",
       fillBottom: "Низ двери",
       fillTypes: {
         glass: "Стеклопакет",
-        sandwich: "Сэндвич-панель"
+        sandwich: "Сэндвич-панель",
+        combined: "Комбинированное (верх — стекло, низ — сэндвич)"
       }
     },
     extras: {
@@ -802,8 +862,16 @@ export const ru = {
   },
   moskitki: {
     title: "Москитные сетки",
-    subtitle: "Предварительный расчёт рамочной сетки для окна с живой схемой размеров.",
+    subtitle: "Рамочная сетка защищает от насекомых и пыли, не перекрывая поток воздуха — подберите размер и узнайте стоимость перед заказом.",
     eyebrow: "Рамочные сетки для окон",
+    screenType: {
+      label: "Тип сетки",
+      options: {
+        standard: "Обычная",
+        anticat: "Антикошка",
+        antimidges: "Антимошка"
+      }
+    },
     visualTitle: "Живая схема сетки",
     visualBody: "Пропорции слева меняются сразу, когда вы меняете ширину и высоту в калькуляторе.",
     visualAlt: "Интерактивная схема рамочной москитной сетки",
@@ -816,16 +884,16 @@ export const ru = {
     },
     calculator: {
       title: "Калькулятор",
-      subtitle: "Предварительная стоимость по размерам и количеству.",
+      subtitle: "Расчёт предварительная стоимость",
       fields: {
         width: "Ширина, мм",
         height: "Высота, мм",
         quantity: "Количество, шт"
       },
       helpers: {
-        width: "Допустимый диапазон: 350-900 мм",
-        height: "Допустимый диапазон: 350-2300 мм",
-        quantity: "Минимум 1 штука"
+        width: "",
+        height: "",
+        quantity: ""
       },
       errors: {
         width: "Введите ширину от 350 до 900 мм",
@@ -837,7 +905,7 @@ export const ru = {
       areaLabel: "Площадь",
       pricePerItemLabel: "За 1 шт",
       totalLabel: "Итого",
-      note: "Расчёт ориентировочный. Точную стоимость подтверждаем после замера."
+      note: ""
     },
     cart: {
       itemTitle: "Москитная сетка",
@@ -901,15 +969,14 @@ export const ru = {
     title: "Личный кабинет",
     subtitleSignedOut: "Войдите, чтобы отправить заявки и отслеживать статус.",
     subtitleSignedIn: "Управляйте заявками и настройками.",
+    phone: "Телефон",
     email: "Email",
     password: "Пароль",
     name: "Имя",
     language: "Язык",
     quotes: "Мои заявки",
     signedInHint: "Вы вошли в аккаунт.",
-    authError: "Ошибка авторизации",
-    googleSignIn: "Войти через Google",
-    googleNotConfigured: "Google-вход пока не настроен. Сначала добавьте Google Client ID."
+    authError: "Ошибка авторизации"
   },
   support: {
     title: "Чат поддержки",
@@ -918,13 +985,13 @@ export const ru = {
     introTitle: "Мы на связи",
     introBody: "Опишите задачу, сроки или проблему — менеджер ответит прямо здесь.",
     guestTitle: "Представьтесь перед первым сообщением",
-    guestHint: "Оставьте имя и телефон или email, чтобы мы могли связаться с вами по вопросу.",
+    guestHint: "Оставьте имя и телефон, чтобы мы могли связаться с вами по вопросу.",
     namePlaceholder: "Как к вам обращаться",
     phonePlaceholder: "Телефон для связи",
     emailPlaceholder: "Email для связи",
     emailOptional: "необязательно",
     messageLabel: "Сообщение",
-    messagePlaceholder: "Напишите сообщение",
+    messagePlaceholder: "Напишите ответ...",
     send: "Отправить",
     sending: "Отправка...",
     emptyTitle: "Пока нет сообщений",
@@ -936,11 +1003,24 @@ export const ru = {
     you: "Вы",
     manager: "Менеджер",
     system: "Система",
+    botName: "Виртуальный помощник",
+    botTyping: "Печатает...",
+    managerWillConnect: "Менеджер подключится в ближайшее время.",
     unread: "Есть непрочитанный ответ",
     guestNameRequired: "Введите имя перед отправкой первого сообщения.",
-    guestContactRequired: "Укажите телефон или email перед отправкой первого сообщения.",
+    guestContactRequired: "Укажите номер телефона перед отправкой первого сообщения.",
     messageRequired: "Введите сообщение.",
-    sendFailed: "Не удалось отправить сообщение. Попробуйте ещё раз."
+    sendFailed: "Не удалось отправить сообщение. Попробуйте ещё раз.",
+    quickReplies: {
+      order: "Как оформить заказ?",
+      calculate: "Как рассчитать стоимость?",
+      productionTime: "Какие сроки изготовления?",
+      measurer: "Как вызвать замерщика?",
+      warranty: "Есть ли гарантия на изделия?",
+      delivery: "Сколько стоит доставка?",
+      whereIsOrder: "Где мой заказ?",
+      return: "Как сделать возврат?"
+    }
   },
   quotes: {
     title: "Мои заявки",
@@ -968,7 +1048,6 @@ export const ru = {
         status: "Статус",
         total: "Сумма",
         created: "Создано",
-        measurementDate: "Дата замера",
         promoCode: "Промокод",
         subtotal: "Подытог",
         discount: "Скидка"

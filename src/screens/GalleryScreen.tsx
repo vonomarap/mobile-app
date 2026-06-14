@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -10,13 +10,14 @@ import { Card } from "../components/Card";
 import { EmptyState } from "../components/EmptyState";
 import { SiteFooter } from "../components/SiteFooter";
 import { MasonryGrid } from "../components/MasonryGrid";
+import { ImageLightbox } from "../components/ImageLightbox";
 import { fetchGallery, type GalleryItem } from "../services/storefront";
 import { font } from "../theme/font";
 import { radius, spacing } from "../theme/tokens";
 import { useTheme } from "../theme/ThemeProvider";
 import { Ionicons } from "@expo/vector-icons";
 
-function GalleryCard({ item, imageHeight }: { item: GalleryItem; imageHeight: number }): JSX.Element {
+function GalleryCard({ item, imageHeight, onOpenLightbox }: { item: GalleryItem; imageHeight: number; onOpenLightbox: (item: GalleryItem, index: number) => void }): JSX.Element {
   const theme = useTheme();
 
   const images = useMemo(() => {
@@ -47,7 +48,7 @@ function GalleryCard({ item, imageHeight }: { item: GalleryItem; imageHeight: nu
 
   return (
     <Card style={[styles.card, { borderColor: theme.colors.border }]} padded={false} variant="solid">
-      <View style={[styles.media, { height: imageHeight }]}>
+      <Pressable onPress={() => onOpenLightbox(item, activeIndex)} style={[styles.media, { height: imageHeight }]}>
         {currentUrl ? (
           <Image source={{ uri: currentUrl }} style={styles.mediaImage} resizeMode="cover" />
         ) : (
@@ -99,7 +100,7 @@ function GalleryCard({ item, imageHeight }: { item: GalleryItem; imageHeight: nu
             </View>
           </>
         ) : null}
-      </View>
+      </Pressable>
 
       <View style={styles.body}>
         <Text style={[styles.cardTitle, { color: theme.colors.text }]} numberOfLines={2}>
@@ -132,14 +133,31 @@ export function GalleryScreen(): JSX.Element {
   const { width } = useWindowDimensions();
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ["gallery"], queryFn: fetchGallery });
 
-  const gutter = width < 420 ? spacing.sm : spacing.md;
-  const gap = width < 420 ? spacing.sm : spacing.md;
+  const [lightboxVisible, setLightboxVisible] = useState(false);
+  const [lightboxItem, setLightboxItem] = useState<GalleryItem | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+
+  const openLightbox = useCallback((item: GalleryItem, index: number) => {
+    setLightboxItem(item);
+    setLightboxIndex(index);
+    setLightboxVisible(true);
+  }, []);
+
+  const closeLightbox = useCallback(() => {
+    setLightboxVisible(false);
+  }, []);
 
   const numColumns = useMemo(() => {
     if (width >= 1100) return 3;
-    if (width >= 360) return 2;
+    if (width >= 420) return 2;
     return 1;
   }, [width]);
+
+  const gutter = spacing.md;
+  const gap = width < 420 ? spacing.sm : spacing.md;
+
+  const minImgHeight = numColumns === 1 ? 200 : 160;
+  const maxImgHeight = numColumns === 1 ? 420 : 360;
 
   const contentWidth = Math.max(0, Math.min(width, theme.layout.maxWidth) - gutter * 2);
   const columnWidth = numColumns > 0 ? (contentWidth - gap * (numColumns - 1)) / numColumns : contentWidth;
@@ -178,7 +196,9 @@ export function GalleryScreen(): JSX.Element {
       >
         <View style={styles.header}>
           <PromoBanners placement="gallery" />
-          <ScreenHeader title={t("gallery.title")} subtitle={t("gallery.subtitle")} />
+          <View style={styles.headerWrap}>
+            <ScreenHeader title={t("gallery.title")} subtitle={t("gallery.subtitle")} />
+          </View>
         </View>
 
         {(data ?? []).length ? (
@@ -187,11 +207,11 @@ export function GalleryScreen(): JSX.Element {
             numColumns={numColumns}
             gap={gap}
             columnWidth={columnWidth}
-            minImageHeight={160}
-            maxImageHeight={360}
+            minImageHeight={minImgHeight}
+            maxImageHeight={maxImgHeight}
             estimateItemHeight={(_, imageHeight) => imageHeight + 92}
             renderItem={({ item, imageHeight }) => (
-              <GalleryCard item={item} imageHeight={imageHeight} />
+              <GalleryCard item={item} imageHeight={imageHeight} onOpenLightbox={openLightbox} />
             )}
           />
         ) : (
@@ -204,6 +224,13 @@ export function GalleryScreen(): JSX.Element {
           <SiteFooter gutter={gutter} />
         </View>
       </AppScrollView>
+
+      <ImageLightbox
+        visible={lightboxVisible}
+        item={lightboxItem}
+        initialIndex={lightboxIndex}
+        onClose={closeLightbox}
+      />
     </ScreenContainer>
   );
 }
@@ -214,8 +241,10 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   header: {
-    gap: spacing.lg,
-    marginBottom: spacing.md
+    gap: spacing.md,
+  },
+  headerWrap: {
+    gap: spacing.xs
   },
   card: {
     width: "100%",
@@ -299,7 +328,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xl
   },
   footerWrap: {
-    marginTop: spacing.lg * 1.9
+    marginTop: "auto"
   },
   empty: {
     textAlign: "center",

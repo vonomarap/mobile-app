@@ -141,11 +141,13 @@ function FieldRow({
   value,
   mono,
   showDivider,
+  valueStyle,
 }: {
   label: string;
   value: string;
   mono?: boolean;
   showDivider?: boolean;
+  valueStyle?: any;
 }): JSX.Element {
   const theme = useTheme();
 
@@ -163,6 +165,7 @@ function FieldRow({
         style={[
           mono ? theme.typography.mono : styles.rowValue,
           { color: theme.colors.text },
+          valueStyle,
         ]}
         numberOfLines={3}
       >
@@ -303,6 +306,8 @@ export function QuoteDetailsScreen(): JSX.Element {
     typeof quote.itemsSubtotal === "number" && Number.isFinite(quote.itemsSubtotal)
       ? quote.itemsSubtotal
       : quote.calcResult?.subtotal ?? total;
+  const discountAmount = quote.calcResult?.discount ?? (itemsSubtotal > total ? itemsSubtotal - total : 0);
+  const hasPromoDiscount = discountAmount > 0;
 
   const calcInput = (quote.calcInput ?? {}) as QuoteCalcInput;
   const calcDto = quote.calcResult?.calcDto;
@@ -471,18 +476,55 @@ export function QuoteDetailsScreen(): JSX.Element {
               value={String(itemsCount)}
               showDivider
             />
-            <FieldRow
+<FieldRow
               label={t("quotes.details.fields.subtotal", { defaultValue: "Подытог" })}
               value={formatMoney(itemsSubtotal, currency)}
               showDivider
+              valueStyle={hasPromoDiscount ? { textDecorationLine: "line-through", color: theme.colors.textMuted } : undefined}
             />
-            <FieldRow label={t("quotes.details.fields.total")} value={formatMoney(total, currency)} showDivider />
-            <FieldRow label={t("quotes.details.fields.created")} value={createdLabel} showDivider />
+            {hasPromoDiscount ? (
+              <FieldRow
+                label={t("calculator.discountLabel", { defaultValue: "Скидка" })}
+                value={`−${formatMoney(discountAmount, currency)}`}
+                showDivider
+                valueStyle={{ color: "#E53935" }}
+              />
+            ) : null}
+            <View
+              style={[
+                styles.row,
+                { borderBottomColor: theme.colors.border, borderBottomWidth: 1 },
+              ]}
+            >
+              <Text style={[styles.rowLabel, { color: theme.colors.textMuted }]} numberOfLines={2}>
+                {t("quotes.details.fields.total")}
+              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs, flex: 1, justifyContent: "flex-end" }}>
+                {hasPromoDiscount ? (
+                  <Text style={[styles.rowValue, { color: theme.colors.textMuted, textDecorationLine: "line-through" }]}>
+                    {formatMoney(itemsSubtotal, currency)}
+                  </Text>
+                ) : null}
+                <Text style={[styles.rowValue, { color: theme.colors.text }]}>
+                  {formatMoney(total, currency)}
+                </Text>
+              </View>
+            </View>
+            {hasPromoDiscount ? (
+              <FieldRow
+                label={t("calculator.discountLabel", { defaultValue: "Скидка" })}
+                value={`−${formatMoney(discountAmount, currency)}`}
+                showDivider
+                valueStyle={{ color: "#E53935" }}
+              />
+            ) : null}
             <FieldRow
-              label={t("quotes.details.fields.measurementDate")}
-              value={formatIsoDate(quote.preferredMeasurementDate ?? null, lang)}
+              label={t("quotes.details.fields.total")}
+              value={hasPromoDiscount ? `${formatMoney(itemsSubtotal, currency)} ${formatMoney(total, currency)}` : formatMoney(total, currency)}
               showDivider
+              valueStyle={hasPromoDiscount ? undefined : undefined}
             />
+            <FieldRow label={t("quotes.details.fields.created")} value={createdLabel} showDivider />
             {quote.promoCode ? (
               <FieldRow label={t("quotes.details.fields.promoCode")} value={String(quote.promoCode)} mono showDivider={quoteItems.length > 0} />
             ) : (
@@ -803,17 +845,34 @@ export function QuoteDetailsScreen(): JSX.Element {
               label={t("quotes.details.fields.subtotal")}
               value={formatMoney(quote.calcResult?.subtotal ?? total, currency)}
               showDivider
+              valueStyle={hasPromoDiscount ? { textDecorationLine: "line-through", color: theme.colors.textMuted } : undefined}
             />
             <FieldRow
               label={t("quotes.details.fields.discount")}
-              value={formatMoney(quote.calcResult?.discount ?? 0, currency)}
+              value={`−${formatMoney(discountAmount, currency)}`}
               showDivider
+              valueStyle={{ color: "#E53935" }}
             />
-            <FieldRow
-              label={t("quotes.details.fields.total")}
-              value={formatMoney(total, currency)}
-              showDivider={isMoskitkiOnly && quoteItems.length > 0}
-            />
+            <View
+              style={[
+                styles.row,
+                { borderBottomColor: theme.colors.border, borderBottomWidth: isMoskitkiOnly && quoteItems.length > 0 ? 1 : 0 },
+              ]}
+            >
+              <Text style={[styles.rowLabel, { color: theme.colors.textMuted }]} numberOfLines={2}>
+                {t("quotes.details.fields.total")}
+              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs, flex: 1, justifyContent: "flex-end" }}>
+                {hasPromoDiscount ? (
+                  <Text style={[styles.rowValue, { color: theme.colors.textMuted, textDecorationLine: "line-through" }]}>
+                    {formatMoney(quote.calcResult?.subtotal ?? total, currency)}
+                  </Text>
+                ) : null}
+                <Text style={[styles.rowValue, { color: theme.colors.text }]}>
+                  {formatMoney(total, currency)}
+                </Text>
+              </View>
+            </View>
             {isMoskitkiOnly && quoteItems.length ? (
               <View style={{ marginTop: spacing.sm }}>
                 {quoteItems.map((item, index) => {

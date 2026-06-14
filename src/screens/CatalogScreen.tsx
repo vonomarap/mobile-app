@@ -195,7 +195,7 @@ export function CatalogScreen(): JSX.Element {
   const { width } = useWindowDimensions();
   const isWeb = Platform.OS === "web";
   const [queryText, setQueryText] = useState("");
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const viewMode = "grid" as any;
   const [sortMode, setSortMode] = useState<SortMode>("catalog");
   const [page, setPage] = useState(1);
   const [animToken, setAnimToken] = useState(0);
@@ -252,11 +252,7 @@ export function CatalogScreen(): JSX.Element {
     setAnimToken((v) => v + 1);
   };
 
-  const handleViewChange = (next: "grid" | "list") => {
-    if (next === viewMode) return;
-    setViewMode(next);
-    setAnimToken((v) => v + 1);
-  };
+
 
   const numColumns = useMemo(() => {
     if (viewMode === "list") return 1;
@@ -267,7 +263,7 @@ export function CatalogScreen(): JSX.Element {
   }, [viewMode, width]);
 
   const isDesktop = isWeb && width >= theme.layout.desktopNavMinWidth;
-  const desktopCardGap = isDesktop ? spacing.sm * 1.15 : spacing.sm;
+  const desktopCardGap = isDesktop ? spacing.md : spacing.sm;
   const contentWidth = Math.min(width, theme.layout.maxWidth);
   const sideMargin = Math.max(0, Math.floor((width - contentWidth) / 2));
   // Give strong hover glows room to render without being clipped by the scroll viewport.
@@ -278,8 +274,8 @@ export function CatalogScreen(): JSX.Element {
     if (viewMode !== "grid") return null;
     if (numColumns <= 1) return null;
 
-    const padding = spacing.md; // styles.list uses spacing.md padding for grid
-    const gap = isDesktop ? desktopCardGap : spacing.sm; // styles.row uses spacing.sm gap between columns
+    const padding = spacing.md;
+    const gap = isDesktop ? desktopCardGap : spacing.sm;
     const available = contentWidth - padding * 2 - gap * (numColumns - 1);
     return Math.max(160, Math.floor(available / numColumns));
   }, [contentWidth, desktopCardGap, isDesktop, numColumns, viewMode]);
@@ -448,6 +444,7 @@ export function CatalogScreen(): JSX.Element {
           styles.list,
           viewMode === "list" ? styles.listList : null,
           viewMode === "grid" && isDesktop ? { gap: desktopCardGap } : null,
+          viewMode === "grid" && !isDesktop ? { gap: spacing.md } : null,
           viewMode === "grid" && glowGutter ? { paddingHorizontal: spacing.md + glowGutter } : null,
         ]}
         numColumns={numColumns}
@@ -458,9 +455,10 @@ export function CatalogScreen(): JSX.Element {
         ListHeaderComponent={
           <View style={styles.header}>
             <PromoBanners placement="catalog" />
-            <ScreenHeader title={t("catalog.title")} subtitle={t("catalog.subtitle")} />
+            <View style={styles.headerWrap}>
+              <ScreenHeader title={t("catalog.title")} subtitle={t("catalog.subtitle")} />
+            </View>
             <TextField
-              label={t("common.search")}
               leftSlot={<Ionicons name="search-outline" size={18} color={theme.colors.primary} />}
               value={queryText}
               onChangeText={setQueryText}
@@ -480,14 +478,7 @@ export function CatalogScreen(): JSX.Element {
                 onChange={handleSortChange}
               />
 
-              <IconSegmentedControl
-                value={viewMode}
-                options={[
-                  { value: "grid", label: t("catalog.filters.view.grid"), icon: "grid-outline" },
-                  { value: "list", label: t("catalog.filters.view.list"), icon: "list-outline" },
-                ]}
-                onChange={handleViewChange}
-              />
+
             </View>
           </View>
         }
@@ -497,7 +488,7 @@ export function CatalogScreen(): JSX.Element {
           </View>
         }
 		        ListFooterComponent={
-		          <View style={[{ gap: spacing.md }, isDesktop ? ({ marginTop: "auto" } as any) : null]}>
+		          <View style={[{ gap: spacing.md, marginTop: "auto" }]}>
 		            {showPager ? (
 		              <View style={styles.pagerWrap}>
 	                <View
@@ -577,7 +568,7 @@ export function CatalogScreen(): JSX.Element {
               reduceMotion={reduceMotion}
               mode={viewMode}
             >
-              <ProductCard item={item} kind={kind} onPress={onPress} variant="grid" />
+              <ProductCard item={item} kind={kind} onPress={onPress} variant="grid" desktopGrid={isDesktop} />
             </AnimatedCatalogItem>
           );
 
@@ -618,8 +609,10 @@ const styles = StyleSheet.create({
     overflow: "visible"
   },
   header: {
-    gap: spacing.md,
-    marginBottom: spacing.md
+    gap: spacing.md
+  },
+  headerWrap: {
+    gap: spacing.xs
   },
   filters: {
     flexDirection: "row",

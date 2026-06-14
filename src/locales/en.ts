@@ -24,7 +24,8 @@ export const en = {
       brown: "Brown"
     }
   },
-  tabs: {
+tabs: {
+    home: "Home",
     catalog: "Catalog",
     moskitki: "Mosquito screens",
     gallery: "Portfolio",
@@ -394,6 +395,48 @@ export const en = {
     promosLink: "Promos",
     regionTagline: "Windows, doors, and accessories across Krasnodar Krai."
   },
+  home: {
+    hero: {
+      title: "Windows in Krasnodar Krai",
+      subtitle: "Official representative of the Breathing Windows Factory in Kanevskoy District",
+      pill: "Windows · Doors · Screens",
+      cta: "Estimate price",
+      catalogCta: "Catalog"
+    },
+    nav: {
+      calc: "Calculator",
+      catalog: "Product catalog",
+      moskitki: "Mosquito screens"
+    },
+    gallery: {
+      title: "Our work",
+      seeAll: "See all"
+    },
+    benefits: {
+      warranty: "Warranty",
+      warrantyDesc: "Up to 5 years on products and installation",
+      speed: "Fast production",
+      speedDesc: "From 3 business days after measurement",
+      delivery: "Regional delivery",
+      deliveryDesc: "Krasnodar and all of Krasnodar Krai",
+      install: "Turnkey installation",
+      installDesc: "Professional setup with quality control",
+      supply: "Direct supplies",
+      supplyDesc: "From the manufacturer, no middlemen",
+      original: "Original components",
+      originalDesc: "Certified products from the manufacturer"
+    },
+    quote: {
+      title: "Need help?",
+      subtitle: "Leave your phone — we'll call back and help choose the right configuration.",
+      phonePlaceholder: "+7 (___) ___-__-__",
+      submit: "Call me back",
+      submitting: "Submitting...",
+      successTitle: "Request submitted",
+      successBody: "We'll call you back shortly.",
+      phoneRequired: "Enter your phone number"
+    }
+  },
   catalog: {
     title: "Catalog",
     subtitle: "Windows, doors, and accessories across Krasnodar Krai.",
@@ -430,7 +473,7 @@ export const en = {
     notFound: "Product not found",
     notFoundHint: "The item may have been removed or hidden from the catalog.",
     backToCatalog: "Back to catalog",
-    priceFrom: "From",
+    priceFrom: "from",
     priceOnRequest: "Price on request",
     descriptionTitle: "Description",
     emptyDescription: "No description yet.",
@@ -448,7 +491,7 @@ export const en = {
   },
   calculator: {
     title: "Calculator",
-    subtitle: "Price calculation and request submission across Krasnodar Krai.",
+    subtitle: "Choose the construction type, dimensions, and options — the calculator shows a preliminary price with no on-site measurement needed.",
     needAuth: "Sign in to submit a quote",
     promoTitle: "Promo",
     quoteTitle: "Quote",
@@ -481,7 +524,8 @@ export const en = {
     productType: "Product type",
     types: {
       window: "Window",
-      door: "Door"
+      door: "Door",
+      balconyBlock: "Balcony block"
     },
     doorSubtype: "Door type",
     doorSubtypes: {
@@ -501,6 +545,17 @@ export const en = {
     meetingPairNoMullion: "No center mullion (meeting pair)",
     sashOpening: "Sash opening",
     sashCount: "Sashes",
+    sashCounts: {
+      window: {
+        "1": "Single-sash window",
+        "2": "Double-sash window",
+        "3": "Triple-sash window"
+      },
+      balconyBlock: {
+        "2": "Double-sash balcony block",
+        "3": "Triple-sash balcony block"
+      }
+    },
     openingSashes: "Opening",
     openingType: "Opening type",
     openingTypes: {
@@ -601,12 +656,9 @@ export const en = {
     municipalityPlaceholder: "Select a district or area",
     kanevskyPlace: "Locality",
     kanevskyPlacePlaceholder: "Select a locality",
-    preferredDate: "Preferred measurement date",
-    datePlaceholder: "Any convenient date",
-    calendarTitle: "Select measurement date",
     namePlaceholder: "Your name",
-    phonePlaceholder: "+1 555 123 4567",
-    phoneHint: "Add your country code",
+    phonePlaceholder: "555 123 4567",
+    phoneHint: "",
     emailPlaceholder: "name@example.com",
     validation: {
       nameRequired: "Enter your name",
@@ -618,8 +670,15 @@ export const en = {
       maxOrderItems: "Maximum 20 products in one order."
     },
     totalLabel: "Draft total",
+    summary: {
+      sizeLabel: "Size",
+    },
     promoApplied: "Promo applied",
     disclaimer: "Estimated price. Final price after measurement.",
+    volumeDiscountLabel: "Volume discount",
+    volumeDiscountPercent: "{{percent}}% volume discount",
+    volumeNextTierFirst: "Add {{count}} more items for {{percent}}% discount",
+    volumeNextTierImprovement: "Add {{count}} more items for {{percent}}% discount",
     breakdown: {
       title: "Estimate breakdown",
       groups: {
@@ -680,7 +739,8 @@ export const en = {
       fillBottom: "Bottom section",
       fillTypes: {
         glass: "Glass unit",
-        sandwich: "Sandwich panel"
+        sandwich: "Sandwich panel",
+        combined: "Combined (glass top, sandwich bottom)"
       }
     },
     extras: {
@@ -802,8 +862,16 @@ export const en = {
   },
   moskitki: {
     title: "Mosquito screens",
-    subtitle: "Preliminary pricing for a framed window screen with a live size preview.",
+    subtitle: "A framed screen keeps insects and dust out while letting fresh air in — pick your dimensions and check the price before ordering.",
     eyebrow: "Framed screens for windows",
+    screenType: {
+      label: "Screen type",
+      options: {
+        standard: "Standard",
+        anticat: "Anti-cat",
+        antimidges: "Anti-midge"
+      }
+    },
     visualTitle: "Live screen preview",
     visualBody: "The proportions on the left update instantly when you change width and height in the calculator.",
     visualAlt: "Interactive framed mosquito screen preview",
@@ -901,15 +969,14 @@ export const en = {
     title: "Account",
     subtitleSignedOut: "Sign in to submit quotes and track status.",
     subtitleSignedIn: "Manage your quotes and preferences.",
+    phone: "Phone",
     email: "Email",
     password: "Password",
     name: "Name",
     language: "Language",
     quotes: "My quotes",
     signedInHint: "You are signed in.",
-    authError: "Authentication failed",
-    googleSignIn: "Continue with Google",
-    googleNotConfigured: "Google sign-in is not configured yet. Add Google client IDs first."
+    authError: "Authentication failed"
   },
   support: {
     title: "Support chat",
@@ -918,13 +985,13 @@ export const en = {
     introTitle: "We’re here",
     introBody: "Describe your request, timeline, or issue — a manager will reply right here.",
     guestTitle: "Introduce yourself before the first message",
-    guestHint: "Leave your name and phone or email so we can follow up about your request.",
+    guestHint: "Leave your name and phone so we can follow up about your request.",
     namePlaceholder: "How should we address you?",
     phonePlaceholder: "Phone number",
     emailPlaceholder: "Email address",
     emailOptional: "optional",
     messageLabel: "Message",
-    messagePlaceholder: "Type your message",
+    messagePlaceholder: "Type your reply...",
     send: "Send",
     sending: "Sending...",
     emptyTitle: "No messages yet",
@@ -936,11 +1003,24 @@ export const en = {
     you: "You",
     manager: "Manager",
     system: "System",
+    botName: "Virtual Assistant",
+    botTyping: "Typing...",
+    managerWillConnect: "A manager will connect shortly.",
     unread: "You have an unread reply",
     guestNameRequired: "Enter your name before sending the first message.",
-    guestContactRequired: "Enter a phone number or email before sending the first message.",
+    guestContactRequired: "Enter your phone number before sending the first message.",
     messageRequired: "Enter a message.",
-    sendFailed: "Failed to send the message. Please try again."
+    sendFailed: "Failed to send the message. Please try again.",
+    quickReplies: {
+      order: "How to place an order?",
+      calculate: "How to calculate the cost?",
+      productionTime: "What are the production times?",
+      measurer: "How to call a measurer?",
+      warranty: "Is there a warranty on products?",
+      delivery: "How much is delivery?",
+      whereIsOrder: "Where is my order?",
+      return: "How to make a return?"
+    }
   },
   quotes: {
     title: "My quotes",
@@ -968,7 +1048,6 @@ export const en = {
         status: "Status",
         total: "Total",
         created: "Created",
-        measurementDate: "Measurement date",
         promoCode: "Promo code",
         subtotal: "Subtotal",
         discount: "Discount"

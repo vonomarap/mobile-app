@@ -52,7 +52,7 @@ export function ProductDetailsScreen(): JSX.Element {
     gcTime: 24 * 60 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
-  const brandName = (siteSettingsQuery.data?.brandName ?? "").trim() || "КанОкна";
+  const brandName = (siteSettingsQuery.data?.brandName ?? "").trim() || "Канокна";
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["product", productId],
@@ -81,11 +81,11 @@ export function ProductDetailsScreen(): JSX.Element {
       typeof pathnameRaw === "string" && pathnameRaw.startsWith("/product/")
         ? pathnameRaw
         : `/product/${encodeURIComponent(data.id)}`;
-    const canonical = `https://kanokna.web.app${pathname}`;
+    const canonical = `https://kanokna.org${pathname}`;
     const description =
       (data.description?.trim() || `Карточка товара ${data.title} с характеристиками и переходом в калькулятор стоимости.`).slice(0, 220);
     const title = `${data.title} | ${brandName}`;
-    const ogImage = data.image?.trim() || "https://kanokna.web.app/og-catalog-v3.png";
+    const ogImage = data.image?.trim() || "https://kanokna.org/og-catalog-v3.png";
 
     const upsertMeta = (key: { name?: string; property?: string }, content: string) => {
       const selector = key.name ? `meta[name="${key.name}"]` : `meta[property="${key.property}"]`;
@@ -444,6 +444,7 @@ function makeStyles(
       paddingBottom: 0
     },
     content: {
+      flex: 1,
       width: "100%",
       maxWidth: 1120,
       alignSelf: "center",

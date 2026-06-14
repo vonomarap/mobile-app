@@ -7,15 +7,14 @@ import { Alert, Platform, StyleSheet, Text, useWindowDimensions, View } from "re
 import { useTranslation } from "react-i18next";
 import { AppScrollView } from "../components/AppScrollView";
 import { Card } from "../components/Card";
-import { DatePickerModal } from "../components/DatePickerModal";
 import { PickerField } from "../components/PickerField";
-import { PriceBreakdownList } from "../components/PriceBreakdownList";
+
 import { PrimaryButton } from "../components/PrimaryButton";
 import { QuoteSuccessModal } from "../components/QuoteSuccessModal";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { SelectListModal, type SelectListOption } from "../components/SelectListModal";
-import { SiteFooter } from "../components/SiteFooter";
+
 import { TextField } from "../components/TextField";
 import { KANEVSKY_MUNICIPALITY_ID, kanevskyPlaces, krasnodarMunicipalities } from "../constants/krasnodarLocations";
 import { RootStackParamList } from "../navigation/types";
@@ -25,7 +24,6 @@ import { useCart } from "../services/cart-context";
 import { ICON_SIZE, calculatorSectionIcon } from "../theme/iconography";
 import { spacing } from "../theme/tokens";
 import { useTheme } from "../theme/ThemeProvider";
-import { buildQuoteBreakdown } from "../utils/calc-breakdown";
 import { formatMoney } from "../utils/money";
 import { formatOrderItemLabel } from "../utils/order-items";
 
@@ -46,8 +44,6 @@ export function QuoteRequestScreen(): JSX.Element {
   const [phone, setPhone] = useState("");
   const [selectedMunicipalityId, setSelectedMunicipalityId] = useState<string | null>(null);
   const [selectedKanevskyPlaceId, setSelectedKanevskyPlaceId] = useState<string | null>(null);
-  const [preferredDate, setPreferredDate] = useState<string | null>(null);
-  const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [locationPickerOpen, setLocationPickerOpen] = useState<LocationPickerKey | null>(null);
   const [locationPickerRect, setLocationPickerRect] = useState<PickerRect | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
@@ -59,21 +55,9 @@ export function QuoteRequestScreen(): JSX.Element {
   const quoteMutation = useMutation({ mutationFn: createQuote });
   const { clear } = useCart();
 
-  const currentLang = i18n.language?.toLowerCase().startsWith("ru") ? "ru" : "en";
-  const formatPreferredDate = (iso: string | null): string => {
-    if (!iso) return "";
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso.trim());
-    if (!m) return iso;
-    const y = m[1];
-    const mo = m[2];
-    const d = m[3];
-    return currentLang === "ru" ? `${d}.${mo}.${y}` : `${y}-${mo}-${d}`;
-  };
-
   const params = route.params;
   const orderItems = Array.isArray(params?.orderItems) ? params.orderItems : [];
   const currency = params?.currency;
-  const promoCode = params?.promoCode ?? null;
 
   const municipalityOptions = useMemo<SelectListOption<string>[]>(
     () => [...krasnodarMunicipalities]
@@ -164,13 +148,17 @@ export function QuoteRequestScreen(): JSX.Element {
     () => orderItems.reduce((sum, item) => sum + (Number(item.preview?.total) || 0), 0),
     [orderItems]
   );
-  const previewTotal = typeof params?.previewTotal === "number" && Number.isFinite(params.previewTotal)
-    ? params.previewTotal
-    : orderSubtotal;
-  const breakdown = useMemo(
-    () => buildQuoteBreakdown(orderItems.map((item) => item.preview?.calcDto), Math.max(0, orderSubtotal - previewTotal)),
-    [orderItems, orderSubtotal, previewTotal]
-  );
+  const volumeDiscountParam = typeof params?.volumeDiscountAmount === "number" && Number.isFinite(params.volumeDiscountAmount) && params.volumeDiscountAmount > 0
+    ? params.volumeDiscountAmount
+    : null;
+  const previewTotal = useMemo(() => {
+    const afterVolumeDiscount = volumeDiscountParam !== null
+      ? Math.max(0, orderSubtotal - volumeDiscountParam)
+      : orderSubtotal;
+    return typeof params?.previewTotal === "number" && Number.isFinite(params.previewTotal)
+      ? params.previewTotal
+      : afterVolumeDiscount;
+  }, [orderSubtotal, volumeDiscountParam, params?.previewTotal]);
 
   const onSubmit = async () => {
     if (!orderItems.length || !currency) return;
@@ -203,9 +191,7 @@ export function QuoteRequestScreen(): JSX.Element {
           phone: trimmedPhone
         },
         address: composedAddress,
-        preferredMeasurementDate: preferredDate || null,
         currency,
-        promoCode
       });
 
       const uid = auth.currentUser?.uid;
@@ -229,7 +215,7 @@ export function QuoteRequestScreen(): JSX.Element {
         <View style={styles.center}>
           <Ionicons name="alert-circle-outline" size={22} color={theme.colors.primary} />
           <Text style={[styles.centerText, { color: theme.colors.textMuted }]}> 
-            {t("calculator.disclaimer")}
+            {t("cart.empty", { defaultValue: "Корзина пуста" })}
           </Text>
           <PrimaryButton title={t("common.back")} tone="soft" onPress={() => navigation.goBack()} />
         </View>
@@ -242,7 +228,9 @@ export function QuoteRequestScreen(): JSX.Element {
       <>
         <AppScrollView trackNavGlass contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
           <View style={desktopContent}>
-            <ScreenHeader title={t("calculator.submitQuote")} subtitle={t("calculator.disclaimer")} />
+            <View style={styles.headerWrap}>
+              <ScreenHeader title={t("calculator.submitQuote")} />
+            </View>
           </View>
 
           <View style={desktopContent}>
@@ -278,34 +266,46 @@ export function QuoteRequestScreen(): JSX.Element {
                 ))}
               </View>
 
-              <View style={[styles.totalWrap, { borderTopColor: theme.colors.border }]}> 
-                <Text style={[styles.totalLabel, { color: theme.colors.textMuted }]}> 
+              <View style={[styles.totalWrap, { borderTopColor: theme.colors.border }]}>
+                <Text style={[styles.subtotalLabel, { color: theme.colors.textMuted }]}>
                   {t("quotes.details.fields.subtotal", { defaultValue: "Подытог" })}
                 </Text>
-                <Text style={[styles.totalValue, { color: theme.colors.text }]}> 
+                <Text
+                  style={[
+                    styles.subtotalValue,
+                    volumeDiscountParam !== null
+                      ? { color: theme.colors.textMuted, textDecorationLine: "line-through" }
+                      : { color: theme.colors.text },
+                  ]}
+                >
                   {formatMoney(orderSubtotal, currency)}
                 </Text>
               </View>
 
-              {promoCode ? (
+              {volumeDiscountParam !== null ? (
                 <View style={styles.totalWrap}>
-                  <Text style={[styles.totalLabel, { color: theme.colors.textMuted }]}> 
-                    {t("quotes.details.fields.promoCode", { defaultValue: "Промокод" })}
+                  <Text style={[styles.discountLabel, { color: theme.colors.textMuted }]}>
+                    {t("calculator.volumeDiscountLabel", { defaultValue: "Скидка за объём" })}
                   </Text>
-                  <Text style={[styles.totalValue, { color: theme.colors.text }]}>{String(promoCode)}</Text>
+                  <Text style={[styles.discountValue, { color: "#43A047" }]}>
+                    −{formatMoney(volumeDiscountParam, currency)}
+                  </Text>
                 </View>
               ) : null}
 
               <View style={styles.totalWrap}>
-                <Text style={[styles.totalLabel, { color: theme.colors.textMuted }]}> 
-                  {t("calculator.totalLabel")}
-                </Text>
-                <Text style={[styles.totalValue, { color: theme.colors.primary }]}> 
-                  {formatMoney(previewTotal, currency)}
-                </Text>
+                <View />
+                <View style={styles.totalPriceRow}>
+                  {volumeDiscountParam !== null ? (
+                    <Text style={[styles.originalPrice, { color: theme.colors.textMuted }]}>
+                      {formatMoney(orderSubtotal, currency)}
+                    </Text>
+                  ) : null}
+                  <Text style={[styles.totalValue, { color: theme.colors.primary }]}> 
+                    {t("product.priceFrom")} {formatMoney(previewTotal, currency)}
+                  </Text>
+                </View>
               </View>
-              <PriceBreakdownList breakdown={breakdown} currency={currency} style={styles.breakdownList} />
-              <Text style={[styles.disclaimer, { color: theme.colors.textMuted }]}>{t("calculator.disclaimer")}</Text>
             </Card>
           </View>
 
@@ -338,20 +338,8 @@ export function QuoteRequestScreen(): JSX.Element {
                 keyboardType="phone-pad"
                 inputMode="tel"
                 placeholder={t("calculator.phonePlaceholder")}
-                helperText={t("calculator.phoneHint")}
                 errorText={phoneError ?? undefined}
               />
-            </Card>
-          </View>
-
-          <View style={desktopContent}>
-            <Card variant="solid" style={styles.card}>
-              <View style={styles.cardTitleRow}>
-                <View style={[styles.cardTitleIcon, { backgroundColor: theme.colors.primarySoft }]}> 
-                  <Ionicons name={calculatorSectionIcon.address} size={ICON_SIZE.md} color={theme.colors.primary} />
-                </View>
-                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>{t("calculator.sectionAddress")}</Text>
-              </View>
               <View ref={municipalityAnchorRef} collapsable={false}>
                 <PickerField
                   label={t("calculator.municipality")}
@@ -378,15 +366,6 @@ export function QuoteRequestScreen(): JSX.Element {
                   />
                 </View>
               ) : null}
-              <PickerField
-                label={t("calculator.preferredDate")}
-                active={datePickerOpen}
-                leftSlot={<Ionicons name="calendar-outline" size={ICON_SIZE.md} color={theme.colors.primary} />}
-                rightSlot={<Ionicons name="chevron-down" size={18} color={theme.colors.textMuted} />}
-                value={formatPreferredDate(preferredDate)}
-                placeholder={t("calculator.datePlaceholder")}
-                onPress={() => setDatePickerOpen(true)}
-              />
             </Card>
           </View>
 
@@ -400,29 +379,8 @@ export function QuoteRequestScreen(): JSX.Element {
             />
           </View>
 
-          <View style={[desktopContent, ({ marginTop: "auto" } as any)]}>
-            <SiteFooter gutter={spacing.md} />
-          </View>
+          
         </AppScrollView>
-
-        <DatePickerModal
-          open={datePickerOpen}
-          title={t("calculator.calendarTitle")}
-          valueIso={preferredDate}
-          lang={currentLang}
-          minIso={undefined}
-          clearLabel={t("common.clear")}
-          closeLabel={t("common.close")}
-          onSelect={(next) => {
-            setPreferredDate(next);
-            setDatePickerOpen(false);
-          }}
-          onClear={() => {
-            setPreferredDate(null);
-            setDatePickerOpen(false);
-          }}
-          onClose={() => setDatePickerOpen(false)}
-        />
 
         <SelectListModal
           mounted={locationPickerOpen !== null}
@@ -475,6 +433,9 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     paddingBottom: 0
   },
+  headerWrap: {
+    gap: spacing.xs
+  },
   desktopContent: {
     width: "100%",
     maxWidth: 960,
@@ -509,8 +470,8 @@ const styles = StyleSheet.create({
   orderItemRow: {
     borderWidth: 1,
     borderRadius: 12,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm
   },
   orderItemMain: {
     flexDirection: "row",
@@ -520,11 +481,11 @@ const styles = StyleSheet.create({
   },
   orderItemTitle: {
     flex: 1,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "700"
   },
   orderItemPrice: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "800"
   },
   totalWrap: {
@@ -536,15 +497,38 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth
   },
   totalLabel: {
-    fontSize: 12,
-    fontWeight: "700"
+    fontSize: 15,
+    fontWeight: "900"
   },
   totalValue: {
-    fontSize: 13,
-    fontWeight: "800"
+    fontSize: 22,
+    fontWeight: "900"
   },
-  breakdownList: {
-    marginTop: spacing.xs,
+  totalPriceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  originalPrice: {
+    fontSize: 14,
+    fontWeight: "700",
+    textDecorationLine: "line-through",
+  },
+  discountLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  discountValue: {
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  subtotalLabel: {
+    fontSize: 13,
+    fontWeight: "700"
+  },
+  subtotalValue: {
+    fontSize: 14,
+    fontWeight: "800"
   },
   disclaimer: {
     fontSize: 12,

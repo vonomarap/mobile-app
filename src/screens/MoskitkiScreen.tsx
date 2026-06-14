@@ -5,12 +5,14 @@ import { useTranslation } from "react-i18next";
 import { AppScrollView } from "../components/AppScrollView";
 import { Card } from "../components/Card";
 import { PrimaryButton } from "../components/PrimaryButton";
+import { PromoBanners } from "../components/PromoBanners";
 import { RangeField } from "../components/RangeField";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { ScreenHeader } from "../components/ScreenHeader";
+import { SegmentedControl } from "../components/SegmentedControl";
 import { SiteFooter } from "../components/SiteFooter";
-import { TextField } from "../components/TextField";
-import type { QuoteMoskitkiOrderItemDraft } from "../navigation/types";
+import { StepperField } from "../components/StepperField";
+import type { MoskitkiScreenType, QuoteMoskitkiOrderItemDraft } from "../navigation/types";
 import { useCart } from "../services/cart-context";
 import { useCurrencyControls } from "../services/currency-context";
 import { font } from "../theme/font";
@@ -33,13 +35,19 @@ type PricePoint = {
 };
 
 const PRICE_POINTS: PricePoint[] = [
-  { width: 350, height: 350, price: 250, area: 350 * 350 },
-  { width: 350, height: 900, price: 600, area: 350 * 900 },
-  { width: 600, height: 1200, price: 1500, area: 600 * 1200 },
-  { width: 800, height: 1200, price: 1850, area: 800 * 1200 },
-  { width: 900, height: 1800, price: 2500, area: 900 * 1800 },
-  { width: 900, height: 2300, price: 3500, area: 900 * 2300 }
+  { width: 350, height: 350, price: 213, area: 350 * 350 },
+  { width: 350, height: 900, price: 510, area: 350 * 900 },
+  { width: 600, height: 1200, price: 1275, area: 600 * 1200 },
+  { width: 800, height: 1200, price: 1573, area: 800 * 1200 },
+  { width: 900, height: 1800, price: 2125, area: 900 * 1800 },
+  { width: 900, height: 2300, price: 2975, area: 900 * 2300 }
 ].sort((left, right) => left.area - right.area);
+
+const SCREEN_TYPE_MULTIPLIER: Record<MoskitkiScreenType, number> = {
+  standard: 1.0,
+  anticat: 1.5,
+  antimidges: 1.3,
+};
 
 function sanitizeNumericInput(value: string, maxLength = 4): string {
   return value.replace(/[^\d]/g, "").slice(0, maxLength);
@@ -89,6 +97,7 @@ export function MoskitkiScreen(): JSX.Element {
   const [screenWidth, setScreenWidth] = useState("600");
   const [screenHeight, setScreenHeight] = useState("1200");
   const [quantity, setQuantity] = useState("1");
+  const [screenType, setScreenType] = useState<MoskitkiScreenType>("standard");
 
   const gutter = width < 420 ? spacing.sm : spacing.md;
   const isWideLayout = width >= 920;
@@ -110,31 +119,31 @@ export function MoskitkiScreen(): JSX.Element {
   const previewHeightLabel = `${previewHeight} мм`;
   const previewBackdropColor = theme.isDark ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.84)";
   const previewBackdropBorderColor = theme.isDark ? "rgba(255,255,255,0.05)" : "rgba(15,23,42,0.06)";
-  const previewFrameOuterColor = theme.isDark ? "#5a544e" : "#d9d1c6";
-  const previewFrameOuterBorderColor = theme.isDark ? "#7d766d" : "#b9afa2";
-  const previewFrameInnerColor = theme.isDark ? "#37332f" : "#efe9e1";
-  const previewFrameInnerBorderColor = theme.isDark ? "#6d665e" : "#c9beb2";
-  const previewMeshBaseColor = theme.isDark ? "#232522" : "#f6f5f1";
-  const previewMeshBorderColor = theme.isDark ? "rgba(255,255,255,0.05)" : "rgba(15,23,42,0.08)";
-  const previewMeshSheenColor = theme.isDark ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.54)";
-  const previewMeshTextureColor = theme.isDark ? "rgba(186,189,188,0.07)" : "rgba(60,68,74,0.07)";
-  const previewMeshTextureSecondaryColor = theme.isDark ? "rgba(255,255,255,0.05)" : "rgba(15,23,42,0.04)";
-  const previewMeshLineColor = theme.isDark ? "rgba(255,255,255,0.16)" : "rgba(60,68,74,0.15)";
-  const previewMeshLineSoftColor = theme.isDark ? "rgba(255,255,255,0.08)" : "rgba(60,68,74,0.08)";
+  const previewFrameOuterColor = theme.isDark ? "#6b6b6b" : "#c8c8c8";
+  const previewFrameOuterBorderColor = theme.isDark ? "#888888" : "#aaaaaa";
+  const previewFrameInnerColor = theme.isDark ? "#4a4a4a" : "#dedede";
+  const previewFrameInnerBorderColor = theme.isDark ? "#777777" : "#b0b0b0";
+  const previewMeshBaseColor = theme.isDark ? "#3a3d38" : "#e0ddd6";
+  const previewMeshBorderColor = theme.isDark ? "rgba(255,255,255,0.07)" : "rgba(15,23,42,0.12)";
+  const previewMeshSheenColor = theme.isDark ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.35)";
+  const previewMeshTextureColor = theme.isDark ? "rgba(186,189,188,0.09)" : "rgba(60,68,74,0.10)";
+  const previewMeshTextureSecondaryColor = theme.isDark ? "rgba(255,255,255,0.06)" : "rgba(15,23,42,0.06)";
+const previewMeshLineColor = theme.isDark ? "rgba(255,255,255,0.18)" : "rgba(60,68,74,0.22)";
+const previewMeshLineSoftColor = theme.isDark ? "rgba(255,255,255,0.10)" : "rgba(60,68,74,0.12)";
   const previewFrameStyle: ViewStyle = previewAspectRatio >= 1
     ? { width: "96%", maxWidth: isWideLayout ? 420 : 360, aspectRatio: previewAspectRatio, maxHeight: isWideLayout ? 320 : 264 }
     : { height: "96%", maxHeight: isWideLayout ? 452 : 360, aspectRatio: previewAspectRatio, minWidth: 88 };
   const previewVerticalLines = createMeshOffsets(
-    previewAspectRatio >= 1.35 ? 12 : previewAspectRatio >= 0.8 ? 10 : previewAspectRatio >= 0.45 ? 8 : 6
+    previewAspectRatio >= 1.35 ? 18 : previewAspectRatio >= 0.8 ? 14 : previewAspectRatio >= 0.45 ? 11 : 8
   );
   const previewHorizontalLines = createMeshOffsets(
-    previewAspectRatio <= 0.45 ? 18 : previewAspectRatio <= 0.7 ? 15 : 12
+    previewAspectRatio <= 0.45 ? 26 : previewAspectRatio <= 0.7 ? 20 : 16
   );
   const previewVerticalLinesSoft = createMeshOffsets(
-    previewAspectRatio >= 1.35 ? 23 : previewAspectRatio >= 0.8 ? 19 : previewAspectRatio >= 0.45 ? 15 : 11
+    previewAspectRatio >= 1.35 ? 35 : previewAspectRatio >= 0.8 ? 28 : previewAspectRatio >= 0.45 ? 21 : 16
   );
   const previewHorizontalLinesSoft = createMeshOffsets(
-    previewAspectRatio <= 0.45 ? 35 : previewAspectRatio <= 0.7 ? 29 : 23
+    previewAspectRatio <= 0.45 ? 52 : previewAspectRatio <= 0.7 ? 42 : 34
   );
 
   const widthError =
@@ -155,7 +164,7 @@ export function MoskitkiScreen(): JSX.Element {
 
     const areaMm = parsedWidth * parsedHeight;
     const areaM2 = areaMm / 1_000_000;
-    const pricePerItem = Math.round(interpolatePrice(areaMm));
+    const pricePerItem = Math.round(interpolatePrice(areaMm) * SCREEN_TYPE_MULTIPLIER[screenType]);
     const totalPrice = pricePerItem * parsedQuantity;
 
     return {
@@ -166,7 +175,7 @@ export function MoskitkiScreen(): JSX.Element {
       width: parsedWidth,
       height: parsedHeight
     };
-  }, [heightError, parsedHeight, parsedQuantity, parsedWidth, quantityError, widthError]);
+  }, [heightError, parsedHeight, parsedQuantity, parsedWidth, quantityError, screenType, widthError]);
 
   const onAddToCart = () => {
     if (!calculation) return;
@@ -187,6 +196,7 @@ export function MoskitkiScreen(): JSX.Element {
         heightMm: calculation.height,
         quantity: calculation.quantity,
         pricePerItem: calculation.pricePerItem,
+        screenType,
         title: t("moskitki.cart.itemTitle"),
       },
       preview: {
@@ -211,9 +221,10 @@ export function MoskitkiScreen(): JSX.Element {
         contentContainerStyle={[styles.scroll, { paddingHorizontal: gutter, paddingBottom: 0 }]}
       >
         <View style={styles.content}>
+          <PromoBanners placement="catalog" />
+
           <View style={styles.headerWrap}>
-            <Text style={[styles.eyebrow, { color: theme.colors.primary }]}>{t("moskitki.eyebrow")}</Text>
-            <ScreenHeader title={t("moskitki.title")} subtitle={t("moskitki.subtitle")} />
+            <ScreenHeader title={t("moskitki.title")} eyebrow={t("moskitki.eyebrow")} subtitle={t("moskitki.subtitle")} />
           </View>
 
           <View style={styles.topGrid}>
@@ -319,6 +330,21 @@ export function MoskitkiScreen(): JSX.Element {
                 </View>
               </View>
 
+              <View style={styles.typeSelector}>
+                <Text style={[styles.typeSelectorLabel, { color: theme.colors.textMuted }]}>
+                  {t("moskitki.screenType.label")}
+                </Text>
+                <SegmentedControl
+                  value={screenType}
+                  options={[
+                    { label: t("moskitki.screenType.options.standard"), value: "standard" as const },
+                    { label: t("moskitki.screenType.options.anticat"), value: "anticat" as const },
+                    { label: t("moskitki.screenType.options.antimidges"), value: "antimidges" as const },
+                  ]}
+                  onChange={setScreenType}
+                />
+              </View>
+
               <View style={styles.fieldGrid}>
                 <View style={styles.field}>
                   <RangeField
@@ -360,14 +386,13 @@ export function MoskitkiScreen(): JSX.Element {
                     </Text>
                   )}
                 </View>
-                <TextField
+                <StepperField
                   label={t("moskitki.calculator.fields.quantity")}
                   value={quantity}
-                  onChangeText={(value) => setQuantity(sanitizeNumericInput(value, 3))}
-                  keyboardType="numeric"
-                  inputMode="numeric"
-                  helperText={t("moskitki.calculator.helpers.quantity")}
-                  errorText={quantityError}
+                  onChangeText={setQuantity}
+                  min={1}
+                  max={999}
+                  step={1}
                   containerStyle={styles.field}
                 />
               </View>
@@ -385,25 +410,7 @@ export function MoskitkiScreen(): JSX.Element {
                         {`${calculation.width} x ${calculation.height} мм`}
                       </Text>
                     </View>
-                    <View style={styles.summaryRow}>
-                      <Text style={[styles.summaryLabel, { color: theme.colors.textMuted }]}>
-                        {t("moskitki.calculator.areaLabel")}
-                      </Text>
-                      <Text style={[styles.summaryValue, { color: theme.colors.text }]}>
-                        {`${calculation.areaM2.toLocaleString(areaLocale, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2
-                        })} м²`}
-                      </Text>
-                    </View>
-                    <View style={styles.summaryRow}>
-                      <Text style={[styles.summaryLabel, { color: theme.colors.textMuted }]}>
-                        {t("moskitki.calculator.pricePerItemLabel")}
-                      </Text>
-                      <Text style={[styles.summaryValue, { color: theme.colors.text }]}>
-                        {formatMoney(calculation.pricePerItem, currency)}
-                      </Text>
-                    </View>
+                  
                     <View style={[styles.summaryRow, styles.summaryRowTotal]}>
                       <Text style={[styles.summaryTotalLabel, { color: theme.colors.text }]}>
                         {t("moskitki.calculator.totalLabel")}
@@ -440,6 +447,7 @@ function makeStyles(theme: ReturnType<typeof useTheme>, isWideLayout: boolean): 
       flexGrow: 1
     },
     content: {
+      flex: 1,
       width: "100%",
       maxWidth: 1020,
       alignSelf: "center",
@@ -449,12 +457,6 @@ function makeStyles(theme: ReturnType<typeof useTheme>, isWideLayout: boolean): 
     },
     headerWrap: {
       gap: spacing.xs
-    },
-    eyebrow: {
-      ...font(800),
-      fontSize: 12,
-      lineHeight: 16,
-      textTransform: "uppercase"
     },
     topGrid: {
       flexDirection: isWideLayout ? "row" : "column",
@@ -476,20 +478,20 @@ function makeStyles(theme: ReturnType<typeof useTheme>, isWideLayout: boolean): 
       width: "100%",
       flex: 1,
       minHeight: isWideLayout ? 420 : 328,
-      borderRadius: 8,
+      borderRadius: 4,
       overflow: "hidden",
       alignItems: "center",
       justifyContent: "center"
     },
     previewBackdrop: {
       ...StyleSheet.absoluteFillObject,
-      borderRadius: 8,
+      borderRadius: 4,
       borderWidth: 1
     },
     previewFrameOuter: {
       position: "relative",
       borderWidth: 1,
-      borderRadius: 8,
+      borderRadius: 3,
       overflow: "hidden",
       minWidth: 72,
       padding: 10
@@ -497,13 +499,13 @@ function makeStyles(theme: ReturnType<typeof useTheme>, isWideLayout: boolean): 
     previewFrameInner: {
       flex: 1,
       borderWidth: 1,
-      borderRadius: 6,
+      borderRadius: 2,
       padding: 9,
       overflow: "hidden"
     },
     previewMeshField: {
       flex: 1,
-      borderRadius: 4,
+      borderRadius: 1,
       overflow: "hidden",
       borderWidth: 1
     },
@@ -516,35 +518,35 @@ function makeStyles(theme: ReturnType<typeof useTheme>, isWideLayout: boolean): 
     },
     previewMeshTexture: {
       ...StyleSheet.absoluteFillObject,
-      opacity: 0.85
+      opacity: 0.5
     },
     previewMeshTextureSecondary: {
       ...StyleSheet.absoluteFillObject,
-      opacity: 0.62
+      opacity: 0.3
     },
     previewLineVertical: {
       position: "absolute",
       top: 0,
       bottom: 0,
-      width: 1.4
+      width: 0.5
     },
     previewLineHorizontal: {
       position: "absolute",
       left: 0,
       right: 0,
-      height: 1.4
+      height: 0.5
     },
     previewLineVerticalSoft: {
       position: "absolute",
       top: 0,
       bottom: 0,
-      width: 0.7
+      width: 0.3
     },
     previewLineHorizontalSoft: {
       position: "absolute",
       left: 0,
       right: 0,
-      height: 0.7
+      height: 0.3
     },
     calculatorCard: {
       flex: 1,
@@ -574,6 +576,13 @@ function makeStyles(theme: ReturnType<typeof useTheme>, isWideLayout: boolean): 
     },
     cardSubtitle: {
       ...theme.typography.caption
+    },
+    typeSelector: {
+      gap: spacing.xs
+    },
+    typeSelectorLabel: {
+      ...theme.typography.caption,
+      fontWeight: "600"
     },
     fieldGrid: {
       gap: spacing.sm
