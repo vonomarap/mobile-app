@@ -70,7 +70,6 @@ export type CreateQuoteInput = {
     phone: string;
   };
   address?: string;
-  preferredMeasurementDate?: string | null;
   currency?: string;
   promoCode?: string | null;
 };
@@ -95,6 +94,7 @@ export type QuoteItemDetails = {
     heightMm?: number;
     quantity?: number;
     pricePerItem?: number;
+    screenType?: string;
   };
   calcResult?: {
     subtotal?: number;
@@ -127,7 +127,6 @@ export type QuoteDetails = Quote & {
     phone?: string;
   };
   address?: string;
-  preferredMeasurementDate?: string | null;
   promoCode?: string | null;
   source?: string;
   updatedAt?: unknown;
@@ -175,16 +174,17 @@ function isMoskitkiItemInput(item: QuoteItemInput): item is QuoteMoskitkiItemInp
 }
 
 function buildMoskitkiBreakdownItem(
-  moskitki: { title: string; widthMm: number; heightMm: number; quantity: number; pricePerItem: number },
+  moskitki: { title: string; widthMm: number; heightMm: number; quantity: number; pricePerItem: number; screenType?: string },
   total: number
 ): CalcLineItem {
+  const typeSuffix = moskitki.screenType ? ` (${moskitki.screenType})` : "";
   return {
     groupKey: "moskitki",
     key: "moskitki_screen",
     qty: moskitki.quantity,
     unitPrice: moskitki.pricePerItem,
     total,
-    title: `${moskitki.title} ${moskitki.widthMm}x${moskitki.heightMm} мм`,
+    title: `${moskitki.title}${typeSuffix} ${moskitki.widthMm}x${moskitki.heightMm} мм`,
   };
 }
 
@@ -245,6 +245,7 @@ export async function createQuote(input: CreateQuoteInput): Promise<{ quoteId: s
         heightMm,
         quantity,
         pricePerItem,
+        screenType: dataRaw.screenType as string | undefined,
       };
       const total = round2(pricePerItem * quantity);
 
@@ -396,7 +397,6 @@ export async function createQuote(input: CreateQuoteInput): Promise<{ quoteId: s
     },
     contact,
     address: input.address ?? "",
-    preferredMeasurementDate: input.preferredMeasurementDate ?? null,
     promoCode: input.promoCode?.trim().toUpperCase() ?? null,
     source: "mobile_app",
     createdAt: serverTimestamp(),

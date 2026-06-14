@@ -11,11 +11,14 @@ export function isMoskitkiOrderItem(
 export function formatOrderItemLabel(item: QuoteOrderItemDraft, t: Translate): string {
   if (isMoskitkiOrderItem(item)) {
     const title = item.moskitki.title?.trim() || t("moskitki.cart.itemTitle");
+    const screenTypeLabel = item.moskitki.screenType
+      ? ` (${t(`moskitki.screenType.options.${item.moskitki.screenType}`)})`
+      : "";
     const widthMm = Number.isFinite(item.moskitki.widthMm) ? Math.max(0, Math.round(item.moskitki.widthMm)) : 0;
     const heightMm = Number.isFinite(item.moskitki.heightMm) ? Math.max(0, Math.round(item.moskitki.heightMm)) : 0;
     const quantity = Number.isFinite(item.moskitki.quantity) ? Math.max(1, Math.round(item.moskitki.quantity)) : 1;
     const sizeLabel = widthMm > 0 && heightMm > 0 ? `${widthMm}x${heightMm} мм` : "-";
-    return `${title} · ${sizeLabel} · x${quantity}`;
+    return `${title}${screenTypeLabel} · ${sizeLabel} · x${quantity}`;
   }
 
   const input = item.calcInput;

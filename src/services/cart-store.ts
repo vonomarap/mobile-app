@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 import type {
+  MoskitkiScreenType,
   QuoteCalcOrderItemDraft,
   QuoteMoskitkiOrderItemDraft,
   QuoteOrderItemDraft,
@@ -11,12 +12,10 @@ const CART_STORAGE_KEY = "windowDoorStore.cart.v1";
 
 export type CartState = {
   items: QuoteOrderItemDraft[];
-  promoCode: string | null;
 };
 
 const EMPTY_CART: CartState = {
   items: [],
-  promoCode: null,
 };
 
 function getWebStorage(): Storage | null {
@@ -101,6 +100,9 @@ function sanitizeCartItem(value: unknown): QuoteOrderItemDraft | null {
         quantity,
         pricePerItem,
         title: typeof value.moskitki.title === "string" && value.moskitki.title.trim() ? value.moskitki.title.trim() : undefined,
+        screenType: (["standard", "anticat", "antimidges"] as const).includes(value.moskitki.screenType as MoskitkiScreenType)
+          ? (value.moskitki.screenType as MoskitkiScreenType)
+          : undefined,
       },
       preview: {
         ...preview,
@@ -136,7 +138,6 @@ function sanitizeCartState(value: unknown): CartState {
 
   return {
     items,
-    promoCode: promoCode ? promoCode : null,
   };
 }
 

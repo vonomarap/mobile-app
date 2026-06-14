@@ -20,4 +20,9 @@ export {
   type ProfileModelCatalogItem,
   type SashOpening,
   type WindowGeometryConfig,
+  calculateVolumeDiscount,
+  DEFAULT_VOLUME_DISCOUNT,
+  type VolumeDiscountConfig,
+  type VolumeDiscountResult,
+  type VolumeDiscountTier,
 } from "window-door-store-calc-engine";

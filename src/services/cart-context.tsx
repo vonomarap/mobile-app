@@ -1,16 +1,16 @@
 import { PropsWithChildren, createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { QuoteOrderItemDraft } from "../navigation/types";
 import { EMPTY_CART, loadCart, saveCart } from "./cart-store";
+import { calculateVolumeDiscount, type VolumeDiscountResult } from "../utils/calc";
 
 type CartContextValue = {
   ready: boolean;
   items: QuoteOrderItemDraft[];
-  promoCode: string;
   itemsSubtotal: number;
+  volumeDiscount: VolumeDiscountResult;
   addItem: (item: QuoteOrderItemDraft) => void;
   removeItem: (localId: string) => void;
   clear: () => void;
-  setPromoCode: (next: string) => void;
 };
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -18,7 +18,6 @@ const CartContext = createContext<CartContextValue | null>(null);
 export function CartProvider({ children }: PropsWithChildren): JSX.Element {
   const [ready, setReady] = useState(false);
   const [items, setItems] = useState<QuoteOrderItemDraft[]>([]);
-  const [promoCode, setPromoCodeState] = useState<string>("");
 
   useEffect(() => {
     let mounted = true;
@@ -27,7 +26,6 @@ export function CartProvider({ children }: PropsWithChildren): JSX.Element {
       .then((state) => {
         if (!mounted) return;
         setItems(state.items);
-        setPromoCodeState(state.promoCode ?? "");
       })
       .catch((error) => {
         console.warn("Cart hydration failed", error);
@@ -43,11 +41,8 @@ export function CartProvider({ children }: PropsWithChildren): JSX.Element {
 
   useEffect(() => {
     if (!ready) return;
-    void saveCart({
-      items,
-      promoCode: promoCode.trim() ? promoCode.trim() : null,
-    });
-  }, [items, promoCode, ready]);
+    void saveCart({ items });
+  }, [items, ready]);
 
   const addItem = useCallback((item: QuoteOrderItemDraft) => {
     setItems((prev) => {
@@ -62,11 +57,6 @@ export function CartProvider({ children }: PropsWithChildren): JSX.Element {
 
   const clear = useCallback(() => {
     setItems(EMPTY_CART.items);
-    setPromoCodeState(EMPTY_CART.promoCode ?? "");
-  }, []);
-
-  const setPromoCode = useCallback((next: string) => {
-    setPromoCodeState(next);
   }, []);
 
   const itemsSubtotal = useMemo(
@@ -74,18 +64,22 @@ export function CartProvider({ children }: PropsWithChildren): JSX.Element {
     [items]
   );
 
+  const volumeDiscount = useMemo(
+    () => calculateVolumeDiscount(items.length, itemsSubtotal),
+    [items.length, itemsSubtotal]
+  );
+
   const value = useMemo<CartContextValue>(
     () => ({
       ready,
       items,
-      promoCode,
       itemsSubtotal,
+      volumeDiscount,
       addItem,
       removeItem,
       clear,
-      setPromoCode,
     }),
-    [addItem, clear, items, itemsSubtotal, promoCode, ready, removeItem, setPromoCode]
+    [addItem, clear, items, itemsSubtotal, ready, removeItem, volumeDiscount]
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

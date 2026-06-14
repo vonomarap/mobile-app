@@ -19,7 +19,7 @@ export type SupportCustomerMode = "authenticated" | "guest";
 export type SupportAuthorRole = "customer" | "admin" | "system";
 
 export type GuestProfile = {
-  name: string;
+  name?: string;
   phone?: string;
   email?: string;
 };
@@ -49,10 +49,18 @@ export type SupportMessage = {
   authorRole?: SupportAuthorRole;
   text?: string;
   createdAt?: unknown;
+  metadata?: {
+    source?: string;
+  };
 };
 
 function normalizeText(value: string): string {
   return value.replace(/\s+/g, " ").trim().slice(0, 2000);
+}
+
+export function generateGuestName(uid: string): string {
+  const num = parseInt(uid.slice(0, 4), 16) % 10000;
+  return `Гость ${num}`;
 }
 
 export function toSupportMillis(value: unknown): number | null {
@@ -121,7 +129,7 @@ function buildThreadPayload(user: User, guestProfile?: GuestProfile | null) {
     customerMode,
     guestProfile: customerMode === "guest"
       ? {
-          name: trimmedName,
+          name: trimmedName || "Гость",
           ...(trimmedPhone ? { phone: trimmedPhone } : {}),
           ...(trimmedEmail ? { email: trimmedEmail } : {}),
         }
@@ -149,16 +157,6 @@ export async function getOrCreateSupportThread(input: {
   const existing = pickActiveSupportThread(await fetchCustomerThreads(currentUser.uid));
   if (existing && existing.status === "OPEN") {
     return existing;
-  }
-
-  if (currentUser.isAnonymous) {
-    const guestProfile = input.guestProfile;
-    if (!guestProfile?.name?.trim()) {
-      throw new Error("Guest name is required");
-    }
-    if (!guestProfile.phone?.trim() && !guestProfile.email?.trim()) {
-      throw new Error("Guest contact is required");
-    }
   }
 
   const threadRef = doc(collection(db, "support_threads"));
@@ -195,30 +193,62 @@ export async function sendSupportMessage(input: {
     createdAt: serverTimestamp(),
   });
 
-  await markSupportThreadSeenByCustomer(thread.id);
+  const preview = text.slice(0, 200);
+  await updateDoc(doc(db, "support_threads", thread.id), {
+    lastMessageText: preview,
+    lastMessageAt: serverTimestamp(),
+    lastMessageAuthorRole: "customer",
+    lastCustomerMessageAt: serverTimestamp(),
+    adminSeenAt: null,
+    updatedAt: serverTimestamp(),
+    customerSeenAt: serverTimestamp(),
+  });
+
   return { threadId: thread.id };
 }
 
-export function subscribeSupportThreadsForCustomer(uid: string, onValue: (threads: SupportThread[]) => void): Unsubscribe {
-  return onSnapshot(query(collection(db, "support_threads"), where("customerUid", "==", uid)), (snapshot) => {
-    const threads = sortThreadsByUpdatedAtDesc(
-      snapshot.docs.map((docRef) => ({ id: docRef.id, ...(docRef.data() as Omit<SupportThread, "id">) }))
-    );
-    onValue(threads);
-  });
+export function subscribeSupportThreadsForCustomer(
+  uid: string,
+  onValue: (threads: SupportThread[]) => void,
+  onError?: (error: Error) => void,
+): Unsubscribe {
+  return onSnapshot(
+    query(collection(db, "support_threads"), where("customerUid", "==", uid)),
+    (snapshot) => {
+      const threads = sortThreadsByUpdatedAtDesc(
+        snapshot.docs.map((docRef) => ({ id: docRef.id, ...(docRef.data() as Omit<SupportThread, "id">) }))
+      );
+      onValue(threads);
+    },
+    (error) => {
+      console.error("[support-chat] threads subscription error:", error);
+      onError?.(error);
+    },
+  );
 }
 
-export function subscribeSupportMessages(threadId: string, onValue: (messages: SupportMessage[]) => void): Unsubscribe {
-  return onSnapshot(collection(db, "support_threads", threadId, "messages"), (snapshot) => {
-    const messages = snapshot.docs
-      .map((docRef) => ({ id: docRef.id, ...(docRef.data() as Omit<SupportMessage, "id">) }))
-      .sort((left, right) => {
-        const leftMs = toSupportMillis(left.createdAt) ?? 0;
-        const rightMs = toSupportMillis(right.createdAt) ?? 0;
-        return leftMs - rightMs;
-      });
-    onValue(messages);
-  });
+export function subscribeSupportMessages(
+  threadId: string,
+  onValue: (messages: SupportMessage[]) => void,
+  onError?: (error: Error) => void,
+): Unsubscribe {
+  return onSnapshot(
+    collection(db, "support_threads", threadId, "messages"),
+    (snapshot) => {
+      const messages = snapshot.docs
+        .map((docRef) => ({ id: docRef.id, ...(docRef.data() as Omit<SupportMessage, "id">) }))
+        .sort((left, right) => {
+          const leftMs = toSupportMillis(left.createdAt) ?? 0;
+          const rightMs = toSupportMillis(right.createdAt) ?? 0;
+          return leftMs - rightMs;
+        });
+      onValue(messages);
+    },
+    (error) => {
+      console.error("[support-chat] messages subscription error:", error);
+      onError?.(error);
+    },
+  );
 }
 
 export async function markSupportThreadSeenByCustomer(threadId: string): Promise<void> {
