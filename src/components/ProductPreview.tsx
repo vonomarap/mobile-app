@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useMemo, useState } from "react";
-import { LayoutChangeEvent, Platform, StyleSheet, Text, View } from "react-native";
+import { LayoutChangeEvent, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import type { GlassOptionsInput } from "../utils/calc";
 import { font } from "../theme/font";
@@ -37,9 +37,13 @@ export function ProductPreview({
   laminationColor,
   glassOptions,
   decorBars,
-  decorBarsColor
+  decorBarsColor,
+  onChangeWidthCm,
+  onChangeHeightCm,
+  onPressSash,
+  activeSashIndex
 }: {
-  kind: "window" | "door";
+  kind: "window" | "door" | "balconyBlock";
   widthCm: number;
   heightCm: number;
   canvasHeight?: number;
@@ -59,6 +63,10 @@ export function ProductPreview({
   glassOptions?: GlassOptionsInput;
   decorBars?: boolean;
   decorBarsColor?: "white" | "gold" | "brown";
+  onChangeWidthCm?: (width: string) => void;
+  onChangeHeightCm?: (height: string) => void;
+  onPressSash?: (index: number) => void;
+  activeSashIndex?: number;
 }): JSX.Element {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -80,7 +88,7 @@ export function ProductPreview({
   const widthLabel = `${Math.round(w)} cm`;
   const heightLabel = `${Math.round(h)} cm`;
 
-  const normalizedDoorHandleSide = kind === "door" && doorHandleSide === "left" ? "left" : "right";
+  const normalizedDoorHandleSide = (kind === "door" || kind === "balconyBlock") && doorHandleSide === "left" ? "left" : "right";
 
   const isEntranceLikeDoor = kind === "door" && (doorSubtype === "entrance" || doorSubtype === "interior");
   const fallbackSashes = isEntranceLikeDoor ? 1 : clampInt(sashCount ?? (kind === "door" ? 1 : 2), 1, 3);
@@ -92,22 +100,22 @@ export function ProductPreview({
       return [{ widthFlex: 1, opening: "turn" as const, handleSide: normalizedDoorHandleSide }];
     }
 
-    if (kind === "window" && Array.isArray(sashes) && sashes.length) {
+    if ((kind === "window" || kind === "balconyBlock") && Array.isArray(sashes) && sashes.length) {
       const normalized = sashes
         .slice(0, 3)
-        .map((item) => ({
-          widthFlex: Math.max(1, Math.round(toFinite(item?.widthCm, 1))),
-          opening: item?.opening === "turn" || item?.opening === "tiltTurn" ? item.opening : "fixed",
-          handleSide: item?.handleSide === "left" || item?.handleSide === "right" ? item.handleSide : undefined,
+        .map((item, idx) => ({
+          widthFlex: kind === "balconyBlock" && idx === 0 ? 1.25 : Math.max(1, Math.round(toFinite(item?.widthCm, 1))),
+          opening: kind === "balconyBlock" && idx === 0 ? ("turn" as const) : (item?.opening === "turn" || item?.opening === "tiltTurn" ? item.opening : "fixed"),
+          handleSide: kind === "balconyBlock" && idx === 0 ? normalizedDoorHandleSide : (item?.handleSide === "left" || item?.handleSide === "right" ? item.handleSide : undefined),
         }))
         .filter((item) => item.widthFlex > 0);
       if (normalized.length) return normalized;
     }
 
     return Array.from({ length: fallbackSashes }).map((_, idx) => ({
-      widthFlex: 1,
-      opening: idx < fallbackOpening ? fallbackOpeningType : ("fixed" as const),
-      handleSide: idx < fallbackOpening ? (kind === "door" ? normalizedDoorHandleSide : ("right" as const)) : undefined,
+      widthFlex: kind === "balconyBlock" && idx === 0 ? 1.25 : 1,
+      opening: kind === "balconyBlock" && idx === 0 ? ("turn" as const) : (idx < fallbackOpening ? fallbackOpeningType : ("fixed" as const)),
+      handleSide: kind === "balconyBlock" && idx === 0 ? normalizedDoorHandleSide : (idx < fallbackOpening ? ("right" as const) : undefined),
     }));
   }, [fallbackOpening, fallbackOpeningType, fallbackSashes, isEntranceLikeDoor, kind, normalizedDoorHandleSide, sashes]);
 
@@ -167,7 +175,7 @@ export function ProductPreview({
     return rounded;
   }, [kind, sashFlexTotal, sashSpecs, sashes, w]);
 
-  const CANVAS_HEIGHT = clampInt(toFinite(canvasHeight, 220), 160, 720);
+  const CANVAS_HEIGHT = clampInt(toFinite(canvasHeight, 220), 160, 960);
   const PAD = 14;
 
   const productSize = useMemo(() => {
@@ -212,7 +220,7 @@ export function ProductPreview({
   const showGlassEdges = detailLevel !== "low";
   const showHinges = detailLevel === "high";
   const showDrainSlots = detailLevel !== "low";
-  const showDecorBars = kind === "window" && decorBars === true;
+  const showDecorBars = (kind === "window" || kind === "balconyBlock") && decorBars === true;
   const decorBarsColorKey = decorBarsColor === "gold" || decorBarsColor === "brown" ? decorBarsColor : "white";
   const decorBarsLabel = showDecorBars
     ? t("calculator.preview.decorBarsBadge", { color: t(`common.colors.${decorBarsColorKey}`) })
@@ -385,31 +393,12 @@ export function ProductPreview({
         } as any)
       : null;
 
-  const showFrameDrainSlots = showDrainSlots && (kind === "window" || (kind === "door" && doorSubtype === "balcony"));
+  const showFrameDrainSlots = showDrainSlots && (kind === "window" || kind === "balconyBlock" || (kind === "door" && doorSubtype === "balcony"));
 
   return (
     <View style={styles.root}>
-      <View style={styles.topRow}>
-        <View style={styles.widthDim}>
-          <View
-            style={[
-              styles.dimArrow,
-              styles.dimArrowHorizontal,
-              { backgroundColor: theme.isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }
-            ]}
-          >
-            <Ionicons name="resize-outline" size={10} color={theme.colors.textMuted} />
-          </View>
-          <Text style={[styles.dimText, { color: theme.colors.textMuted }]} numberOfLines={1}>
-            {hasDims ? widthLabel : "--"}
-          </Text>
-        </View>
-        <View style={styles.heightGutter} />
-      </View>
-
-      <View style={styles.mainRow}>
-        <View
-          style={[styles.canvas, { height: CANVAS_HEIGHT }]}
+      <View
+        style={[styles.canvas, { height: CANVAS_HEIGHT }]}
           onLayout={onLayout}
         >
           <View style={[StyleSheet.absoluteFill, { backgroundColor: canvasBg }]} />
@@ -419,7 +408,7 @@ export function ProductPreview({
                 <Ionicons name="resize-outline" size={22} color={theme.colors.primary} />
               </View>
               <Text style={[styles.placeholderText, { color: theme.colors.textMuted }]}>
-                {t(kind === "door" ? "calculator.preview.placeholderDoor" : "calculator.preview.placeholderWindow")}
+                {t((kind === "door" || kind === "balconyBlock") ? "calculator.preview.placeholderDoor" : "calculator.preview.placeholderWindow")}
               </Text>
             </View>
           ) : (
@@ -492,17 +481,17 @@ export function ProductPreview({
                           const handleSide = isOpening ? (sash.handleSide === "left" ? "left" : "right") : null;
                           const hingeSide = handleSide === "left" ? "right" : "left";
                           const openingIcon = handleSide === "left" ? "arrow-back" : "arrow-forward";
-                          const showDoorLeaf = kind === "door";
+                          const showDoorLeaf = kind === "door" || (kind === "balconyBlock" && idx === 0);
                           const doorTopFillType = doorFillTop === "sandwich" ? "sandwich" : "glass";
                           const doorBottomFillType = doorFillBottom === "glass" ? "glass" : "sandwich";
                           const doorDividerTop = "58%";
 
-                          const hingeOffsets = kind === "door" ? [0.18, 0.5, 0.82] : [0.22, 0.78];
+                          const hingeOffsets = showDoorLeaf ? [0.18, 0.5, 0.82] : [0.22, 0.78];
 
                           const hardwareInset = Math.max(6, Math.round(sashFrameThickness * 0.7));
 
                           const plateW = clampInt(Math.round(sashFrameThickness * 0.65), 6, 12);
-                          const plateH = clampInt(Math.round(sashFrameThickness * (kind === "door" ? 2.5 : 2.2)), 20, 46);
+                          const plateH = clampInt(Math.round(sashFrameThickness * (showDoorLeaf ? 2.5 : 2.2)), 20, 46);
                           const leverW = clampInt(Math.round(plateH * 0.55), 12, 24);
                           const leverH = clampInt(Math.round(plateW * 0.6), 4, 8);
                           const handleW = plateW + leverW + 6;
@@ -517,7 +506,7 @@ export function ProductPreview({
                             sashFlexTotal > 0 ? Math.round((productSize.w * Math.max(1, sash.widthFlex)) / sashFlexTotal) : 0;
                           const sashWidthValue = sashWidthsCm[idx];
                           const showSashWidthBadge =
-                            kind === "window" && sashPxWidth >= 92 && typeof sashWidthValue === "number" && sashWidthValue > 0;
+                            (kind === "window" || (kind === "balconyBlock" && idx > 0)) && sashPxWidth >= 92 && typeof sashWidthValue === "number" && sashWidthValue > 0;
                           const leafRadius = Math.max(6, radius.sm - 8);
                           const renderLeafFill = (fillType: "glass" | "sandwich", keyPrefix: string, fillStyle?: any) => {
                             if (fillType === "sandwich") {
@@ -678,137 +667,177 @@ export function ProductPreview({
                               />
                             ) : null,
                             <View key={`s-${idx}`} style={[styles.sashWrap, { flexGrow: sash.widthFlex }]}>
-                              <View style={[styles.sashFrame, { padding: sashFrameThickness, borderRadius: Math.max(8, radius.sm - 2) }]}>
-                                <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.sashOuter[0] }]} />
-
-                                <View
-                                  style={[
-                                    styles.sashInner,
+                              <View
+                                style={
+                                  kind === "balconyBlock" && idx > 0
+                                    ? { height: "50%", position: "relative" }
+                                    : { height: "100%", position: "relative" }
+                                }
+                              >
+                                <Pressable
+                                  accessibilityRole="button"
+                                  onPress={() => onPressSash?.(idx)}
+                                  style={({ pressed }: { pressed: boolean }) => [
+                                    styles.sashFrame,
                                     {
-                                      borderRadius: Math.max(6, radius.sm - 6),
-                                      borderColor: theme.isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.08)",
-                                    }
+                                      padding: sashFrameThickness,
+                                      borderRadius: Math.max(8, radius.sm - 2),
+                                      borderColor: activeSashIndex === idx ? theme.colors.primary : "transparent",
+                                      borderWidth: activeSashIndex === idx ? 2 : 0,
+                                    },
+                                    pressed ? { opacity: 0.85 } : null
                                   ]}
                                 >
-                                  {showDoorLeaf ? (
-                                    <View style={styles.doorLeafFill}>
-                                      <View style={[styles.doorLeafSegment, { flex: 58 }]}>
-                                        {renderLeafFill(doorTopFillType, `door-top-${idx}`)}
+                                  <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.sashOuter[0] }]} />
+
+                                  <View
+                                    style={[
+                                      styles.sashInner,
+                                      {
+                                        borderRadius: Math.max(6, radius.sm - 6),
+                                        borderColor: theme.isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.08)",
+                                      }
+                                    ]}
+                                  >
+                                    {showDoorLeaf ? (
+                                      <View style={styles.doorLeafFill}>
+                                        <View style={[styles.doorLeafSegment, { flex: 58 }]}>
+                                          {renderLeafFill(doorTopFillType, `door-top-${idx}`)}
+                                        </View>
+                                        <View style={[styles.doorLeafSegment, { flex: 42 }]}>
+                                          {renderLeafFill(doorBottomFillType, `door-bottom-${idx}`)}
+                                        </View>
+                                        <View
+                                          pointerEvents="none"
+                                          style={[
+                                            styles.doorLeafDivider,
+                                            {
+                                              top: doorDividerTop,
+                                              height: frameThickness,
+                                              transform: [{ translateY: -Math.round(frameThickness / 2) }],
+                                              borderColor: theme.isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)",
+                                            }
+                                          ]}
+                                        >
+                                          <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.sashOuter[0] }]} />
+                                        </View>
                                       </View>
-                                      <View style={[styles.doorLeafSegment, { flex: 42 }]}>
-                                        {renderLeafFill(doorBottomFillType, `door-bottom-${idx}`)}
+                                    ) : (
+                                      renderLeafFill("glass", `glass-${idx}`)
+                                    )}
+                                  </View>
+                                </Pressable>
+
+                                {showSashWidthBadge ? (
+                                  <View pointerEvents="none" style={styles.sashWidthBadge}>
+                                    <View
+                                      style={[
+                                        styles.sashWidthBadgePill,
+                                        {
+                                          backgroundColor: theme.isDark ? "rgba(0,0,0,0.36)" : "rgba(255,255,255,0.78)",
+                                          borderColor: theme.isDark ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.12)",
+                                        }
+                                      ]}
+                                    >
+                                      <Text
+                                        numberOfLines={1}
+                                        ellipsizeMode="tail"
+                                        style={[styles.sashWidthBadgeText, { color: theme.colors.text }]}
+                                      >
+                                        {t("calculator.preview.sashWidthBadge", { width: sashWidthValue })}
+                                      </Text>
+                                    </View>
+                                  </View>
+                                ) : null}
+
+                                {isOpening ? (
+                                  <>
+                                    <View
+                                      style={[
+                                        styles.openingBadge,
+                                        handleSide === "left" ? { right: hardwareInset } : { left: hardwareInset },
+                                        {
+                                          backgroundColor: theme.isDark ? "rgba(0,0,0,0.28)" : "rgba(255,255,255,0.70)",
+                                          borderColor: theme.isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)",
+                                        }
+                                      ]}
+                                    >
+                                      <Ionicons name={openingIcon as any} size={12} color={theme.colors.textMuted} />
+                                      {sash.opening === "tiltTurn" ? (
+                                        <Ionicons name="arrow-up" size={12} color={theme.colors.textMuted} />
+                                      ) : null}
+                                    </View>
+
+                                    <View
+                                      style={[
+                                        styles.handleSet,
+                                        { top: "52%" },
+                                        {
+                                          width: handleW,
+                                          height: handleH,
+                                          transform: handleTransform
+                                        },
+                                        handleSide === "left" ? { left: handleInset } : { right: handleInset }
+                                      ]}
+                                    >
+                                      <View
+                                        style={[
+                                          styles.handlePlate,
+                                          { top: plateTop, width: plateW, height: plateH, borderRadius: Math.max(4, Math.round(plateW * 0.5)), backgroundColor: '#111827' }
+                                        ]}
+                                      >
+                                        <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.handleMetal[0] }]} />
                                       </View>
                                       <View
-                                        pointerEvents="none"
                                         style={[
-                                          styles.doorLeafDivider,
+                                          styles.handleLever,
                                           {
-                                            top: doorDividerTop,
-                                            height: frameThickness,
-                                            transform: [{ translateY: -Math.round(frameThickness / 2) }],
-                                            borderColor: theme.isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)",
+                                            top: leverTop,
+                                            left: Math.max(0, plateW - 1),
+                                            width: leverW,
+                                            height: leverH,
+                                            borderRadius: Math.max(4, Math.round(leverH * 0.5)),
+                                            backgroundColor: '#111827'
                                           }
                                         ]}
                                       >
-                                        <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.sashOuter[0] }]} />
+                                        <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.handleMetal[0] }]} />
                                       </View>
                                     </View>
-                                  ) : (
-                                    renderLeafFill("glass", `glass-${idx}`)
-                                  )}
-                                </View>
+
+                                    {hingeOffsets.map((pos) => (
+                                      showHinges ? (
+                                        <View
+                                          key={`h-${idx}-${pos}`}
+                                          style={[
+                                            styles.hinge,
+                                            { top: `${Math.round(pos * 100)}%` },
+                                            hingeSide === "left" ? { left: hardwareInset - 2 } : { right: hardwareInset - 2 },
+                                            {
+                                              backgroundColor: theme.isDark ? "rgba(0,0,0,0.40)" : "rgba(0,0,0,0.18)",
+                                              borderColor: theme.isDark ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.45)"
+                                            }
+                                          ]}
+                                        />
+                                      ) : null
+                                    ))}
+                                  </>
+                                ) : null}
                               </View>
 
-                              {showSashWidthBadge ? (
-                                <View pointerEvents="none" style={styles.sashWidthBadge}>
-                                  <View
-                                    style={[
-                                      styles.sashWidthBadgePill,
-                                      {
-                                        backgroundColor: theme.isDark ? "rgba(0,0,0,0.36)" : "rgba(255,255,255,0.78)",
-                                        borderColor: theme.isDark ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.12)",
-                                      }
-                                    ]}
-                                  >
-                                    <Text
-                                      numberOfLines={1}
-                                      ellipsizeMode="tail"
-                                      style={[styles.sashWidthBadgeText, { color: theme.colors.text }]}
-                                    >
-                                      {t("calculator.preview.sashWidthBadge", { width: sashWidthValue })}
-                                    </Text>
-                                  </View>
-                                </View>
-                              ) : null}
-
-                              {isOpening ? (
-                                <>
-                                  <View
-                                    style={[
-                                      styles.openingBadge,
-                                      handleSide === "left" ? { right: hardwareInset } : { left: hardwareInset },
-                                      {
-                                        backgroundColor: theme.isDark ? "rgba(0,0,0,0.28)" : "rgba(255,255,255,0.70)",
-                                        borderColor: theme.isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)",
-                                      }
-                                    ]}
-                                  >
-                                    <Ionicons name={openingIcon as any} size={12} color={theme.colors.textMuted} />
-                                    {sash.opening === "tiltTurn" ? (
-                                      <Ionicons name="arrow-up" size={12} color={theme.colors.textMuted} />
-                                    ) : null}
-                                  </View>
-
-                                  <View
-                                    style={[
-                                      styles.handleSet,
-                                      { top: "52%" },
-                                      {
-                                        width: handleW,
-                                        height: handleH,
-                                        transform: handleTransform
-                                      },
-                                      handleSide === "left" ? { left: handleInset } : { right: handleInset }
-                                    ]}
-                                  >
-                                    <View
-                                      style={[
-                                        styles.handlePlate,
-                                        { top: plateTop, width: plateW, height: plateH, borderRadius: Math.max(4, Math.round(plateW * 0.5)), backgroundColor: '#111827' }
-                                      ]}
-                                    />
-                                    <View
-                                      style={[
-                                        styles.handleLever,
-                                        {
-                                          top: leverTop,
-                                          left: Math.max(0, plateW - 1),
-                                          width: leverW,
-                                          height: leverH,
-                                          borderRadius: Math.max(4, Math.round(leverH * 0.5)),
-                                          backgroundColor: '#111827'
-                                        }
-                                      ]}
-                                    />
-                                  </View>
-
-                                  {hingeOffsets.map((pos) => (
-                                    showHinges ? (
-                                      <View
-                                        key={`h-${idx}-${pos}`}
-                                        style={[
-                                          styles.hinge,
-                                          { top: `${Math.round(pos * 100)}%` },
-                                          hingeSide === "left" ? { left: hardwareInset - 2 } : { right: hardwareInset - 2 },
-                                          {
-                                            backgroundColor: theme.isDark ? "rgba(0,0,0,0.40)" : "rgba(0,0,0,0.18)",
-                                            borderColor: theme.isDark ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.45)"
-                                          }
-                                        ]}
-                                      />
-                                    ) : null
-                                  ))}
-                                </>
+                              {kind === "balconyBlock" && idx > 0 ? (
+                                <View
+                                  style={{
+                                    position: "absolute",
+                                    bottom: 0,
+                                    left: 0,
+                                    right: 0,
+                                    height: "50%",
+                                    backgroundColor: canvasBg,
+                                    borderTopWidth: frameThickness,
+                                    borderTopColor: palette.sashOuter[0],
+                                  }}
+                                />
                               ) : null}
                             </View>,
                           ];
@@ -831,21 +860,7 @@ export function ProductPreview({
           )}
         </View>
 
-        <View style={styles.heightDim}>
-          <View
-            style={[
-              styles.dimArrow,
-              styles.dimArrowVertical,
-              { backgroundColor: theme.isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }
-            ]}
-          >
-            <Ionicons name="resize-outline" size={10} color={theme.colors.textMuted} />
-          </View>
-          <Text style={[styles.dimText, styles.dimTextVertical, { color: theme.colors.textMuted }]}>
-            {hasDims ? heightLabel : "--"}
-          </Text>
-        </View>
-      </View>
+
     </View>
   );
 }

@@ -13,6 +13,7 @@ export const AppScrollView = forwardRef<ScrollView, Props>(function AppScrollVie
   onScroll,
   scrollEventThrottle,
   contentContainerStyle,
+  style,
   ...rest
 }: Props, ref): JSX.Element {
   const theme = useTheme();
@@ -27,8 +28,7 @@ export const AppScrollView = forwardRef<ScrollView, Props>(function AppScrollVie
   const flattened = StyleSheet.flatten(contentContainerStyle) as { paddingTop?: number } | undefined;
   const existingPaddingTop = typeof flattened?.paddingTop === "number" ? flattened.paddingTop : 0;
 
-  const baseContentContainerStyle =
-    Platform.OS === "web" ? ([{ flexGrow: 1 }, contentContainerStyle] as any) : contentContainerStyle;
+  const baseContentContainerStyle = [{ flexGrow: 1 }, contentContainerStyle] as any;
 
   const nextContentContainerStyle = desktopNavOffset
     ? [baseContentContainerStyle, { paddingTop: existingPaddingTop + desktopNavOffset }]
@@ -47,13 +47,20 @@ export const AppScrollView = forwardRef<ScrollView, Props>(function AppScrollVie
     onScroll?.(event);
   }, [onScroll, setScrollY, trackNavGlass]);
 
+  const mergedStyle = style ? [{ flex: 1 }, style as any] : styles.flex;
+
   return (
     <ScrollView
       ref={ref}
       {...rest}
+      style={mergedStyle}
       contentContainerStyle={nextContentContainerStyle}
       onScroll={trackNavGlass ? handleScroll : onScroll}
       scrollEventThrottle={trackNavGlass && Platform.OS === "web" ? (scrollEventThrottle ?? 16) : scrollEventThrottle}
     />
   );
+});
+
+const styles = StyleSheet.create({
+  flex: { flex: 1 },
 });

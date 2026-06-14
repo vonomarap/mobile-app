@@ -19,9 +19,9 @@ export type Theme = {
 
 function makeShadow(level: "sm" | "md" | "lg"): object {
   const presets = {
-    sm: { height: 3, opacity: 0.08, radius: 6, elevation: 2 },
-    md: { height: 8, opacity: 0.12, radius: 14, elevation: 5 },
-    lg: { height: 16, opacity: 0.16, radius: 22, elevation: 10 }
+    sm: { height: 2, opacity: 0.05, radius: 8, elevation: 2 },
+    md: { height: 6, opacity: 0.07, radius: 16, elevation: 4 },
+    lg: { height: 12, opacity: 0.09, radius: 24, elevation: 8 }
   } as const;
 
   const preset = presets[level];

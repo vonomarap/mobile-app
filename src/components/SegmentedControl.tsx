@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Animated,
   Easing,
@@ -6,14 +6,11 @@ import {
   Platform,
   Pressable,
   StyleProp,
-  StyleSheet,
   Text,
   TextStyle,
   View
 } from "react-native";
 import { useReduceMotion } from "../hooks/useReduceMotion";
-import { radius, spacing } from "../theme/tokens";
-import { useTheme } from "../theme/ThemeProvider";
 
 export type SegmentOption<T extends string> = {
   label: string;
@@ -44,16 +41,40 @@ export function SegmentedControl<T extends string>({
   marqueeSpeedPxPerSec?: number;
   marqueeMinOverflowPx?: number;
 }): JSX.Element {
-  const theme = useTheme();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
 
   return (
-    <View style={styles.wrap} accessibilityRole="tablist">
+    <View 
+      className="flex-row border border-border dark:border-zinc-800 rounded-xl p-1 bg-zinc-100/60 dark:bg-zinc-900/40 gap-1"
+      accessibilityRole="tablist"
+    >
       {options.map((opt) => {
         const selected = opt.value === value;
         const multiline = labelBehavior === "wrap" && labelNumberOfLines > 1;
         const isMarquee = labelBehavior === "marquee";
         const shouldMarquee = isMarquee && (!marqueeOnlySelected || selected);
+
+        const itemClasses = [
+          "flex-1 items-center justify-center rounded-lg px-2 border border-transparent",
+          selected 
+            ? "bg-white dark:bg-zinc-800 border-border dark:border-zinc-700 shadow-sm" 
+            : "active:opacity-85",
+          multiline ? "min-h-[54px] py-1.5" : "min-h-[40px] py-1",
+          opt.description ? "min-h-[58px] py-1.5" : "",
+        ].filter(Boolean).join(" ");
+
+        const labelClasses = [
+          "text-sm font-semibold text-center",
+          selected 
+            ? "text-zinc-950 dark:text-zinc-50" 
+            : "text-muted-foreground dark:text-zinc-400"
+        ].join(" ");
+
+        const descClasses = [
+          "text-xs text-center mt-0.5",
+          selected 
+            ? "text-zinc-900 dark:text-zinc-105" 
+            : "text-muted-foreground dark:text-zinc-400"
+        ].join(" ");
 
         return (
           <Pressable
@@ -61,39 +82,28 @@ export function SegmentedControl<T extends string>({
             accessibilityRole="tab"
             accessibilityState={{ selected }}
             onPress={() => onChange(opt.value)}
-            style={(state) => {
-              const pressed = state.pressed;
-              const hovered = (state as unknown as { hovered?: boolean }).hovered;
-
-              return [
-                styles.item,
-                multiline ? styles.itemMultiline : null,
-                opt.description ? styles.itemWithDescription : null,
-                selected ? styles.itemSelected : null,
-                hovered && !selected ? styles.itemHovered : null,
-                pressed ? styles.itemPressed : null,
-              ];
-            }}
+            className={itemClasses}
           >
-            <View style={styles.labelStack}>
+            <View className="items-center justify-center gap-0.5 w-full">
               {shouldMarquee ? (
                 <MarqueeLabel
                   text={opt.label}
                   pauseMs={marqueePauseMs}
                   speedPxPerSec={marqueeSpeedPxPerSec}
                   minOverflowPx={marqueeMinOverflowPx}
-                  textStyle={[styles.label, selected ? styles.labelSelected : null]}
+                  textStyle={selected ? { color: "#18181b" } : undefined}
+                  textClass={labelClasses}
                 />
               ) : (
                 <Text
-                  style={[styles.label, selected ? styles.labelSelected : null]}
+                  className={labelClasses}
                   numberOfLines={isMarquee ? 1 : labelNumberOfLines}
                 >
                   {opt.label}
                 </Text>
               )}
               {opt.description ? (
-                <Text style={[styles.description, selected ? styles.descriptionSelected : null]} numberOfLines={1}>
+                <Text className={descClasses} numberOfLines={1}>
                   {opt.description}
                 </Text>
               ) : null}
@@ -110,13 +120,15 @@ function MarqueeLabel({
   pauseMs,
   speedPxPerSec,
   minOverflowPx,
-  textStyle
+  textStyle,
+  textClass
 }: {
   text: string;
   pauseMs: number;
   speedPxPerSec: number;
   minOverflowPx: number;
-  textStyle: StyleProp<TextStyle>;
+  textStyle?: StyleProp<TextStyle>;
+  textClass?: string;
 }): JSX.Element {
   const reduceMotion = useReduceMotion();
   const translateX = useRef(new Animated.Value(0)).current;
@@ -171,100 +183,22 @@ function MarqueeLabel({
     };
   }, [distance, overflowing, pauseMs, reduceMotion, speedPxPerSec, text, translateX]);
 
+  const viewportClasses = [
+    "self-stretch flex-row items-center min-w-0 overflow-hidden",
+    overflowing ? "justify-start" : "justify-center"
+  ].join(" ");
+
   return (
-    <View style={[stylesForMarquee.viewport, overflowing ? stylesForMarquee.viewportOverflow : null]} onLayout={onViewportLayout}>
-      <Animated.View style={[stylesForMarquee.content, { transform: [{ translateX }] }]} onLayout={onContentLayout}>
-        <Text style={textStyle} numberOfLines={1} ellipsizeMode="clip">
+    <View 
+      className={viewportClasses}
+      style={Platform.OS === "web" ? ({ whiteSpace: "nowrap" } as object) : {}} 
+      onLayout={onViewportLayout}
+    >
+      <Animated.View className="flex-shrink-0 self-start" style={{ transform: [{ translateX }] }} onLayout={onContentLayout}>
+        <Text className={textClass} style={textStyle} numberOfLines={1} ellipsizeMode="clip">
           {text}
         </Text>
       </Animated.View>
     </View>
   );
-}
-
-const stylesForMarquee = StyleSheet.create({
-  viewport: {
-    alignSelf: "stretch",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    minWidth: 0,
-    overflow: "hidden",
-    ...(Platform.OS === "web" ? ({ whiteSpace: "nowrap" } as object) : {})
-  },
-  viewportOverflow: {
-    justifyContent: "flex-start"
-  },
-  content: {
-    flexShrink: 0,
-    alignSelf: "flex-start"
-  }
-});
-
-function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof StyleSheet.create> {
-  return StyleSheet.create({
-    wrap: {
-      flexDirection: "row",
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      borderRadius: radius.sm,
-      padding: 4,
-      backgroundColor: theme.colors.surface2,
-      gap: 4
-    },
-    item: {
-      flex: 1,
-      minHeight: 40,
-      alignItems: "center",
-      justifyContent: "center",
-      borderRadius: radius.sm,
-      paddingHorizontal: spacing.sm,
-      borderWidth: 1,
-      borderColor: "transparent",
-      // Remove browser focus ring/outline on web after click/tap.
-      ...( { outlineStyle: "none", outlineWidth: 0, WebkitTapHighlightColor: "transparent" } as object ),
-      ...( { cursor: "pointer" } as object )
-    },
-    itemMultiline: {
-      minHeight: 54,
-      paddingVertical: 6
-    },
-    itemWithDescription: {
-      minHeight: 58,
-      paddingVertical: 6
-    },
-    itemSelected: {
-      backgroundColor: theme.colors.surface,
-      borderColor: theme.colors.border,
-      ...(theme.shadow.sm as object)
-    },
-    itemHovered: {
-      backgroundColor: theme.colors.surface
-    },
-    itemPressed: {
-      opacity: 0.9
-    },
-    label: {
-      ...theme.typography.label,
-      color: theme.colors.textMuted,
-      textAlign: "center"
-    },
-    labelSelected: {
-      color: theme.colors.text
-    },
-    labelStack: {
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 2,
-      minWidth: 0
-    },
-    description: {
-      ...theme.typography.caption,
-      color: theme.colors.textMuted,
-      textAlign: "center"
-    },
-    descriptionSelected: {
-      color: theme.colors.primary
-    }
-  });
 }

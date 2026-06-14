@@ -6,12 +6,12 @@ import { Animated, Easing, Image, LayoutChangeEvent, Platform, Pressable, StyleS
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
 import { MAX_CONTACT_ICON } from "../constants/contactAssets";
-import type { HelpSectionKey, RootStackParamList } from "../navigation/types";
+import type { RootStackParamList } from "../navigation/types";
 import { fetchSiteSettings } from "../services/site-settings";
 import { font } from "../theme/font";
 import { radius, spacing } from "../theme/tokens";
 import { useTheme } from "../theme/ThemeProvider";
-import { buildExternalUrl, buildMailtoUrl, buildPhoneUrl, buildTelegramUrl, buildWhatsAppUrl } from "../utils/contact-links";
+import { buildExternalUrl, buildMailtoUrl, buildPhoneUrl, buildTelegramUrl } from "../utils/contact-links";
 
 type Props = {
   gutter?: number;
@@ -29,14 +29,6 @@ const FOOTER_STACK_MAX_WIDTH = 1100;
 const SUPPORT_TELEGRAM_USERNAME = "kanokna_support_bot";
 const SUPPORT_TELEGRAM_FALLBACK = `${SUPPORT_TELEGRAM_USERNAME}?start=site`;
 const OLD_LOCAL_GEO_RE = /канев|kanev|каневск|kanevsk|каневской|каневском|район|district/i;
-const HELP_FOOTER_LINKS: ReadonlyArray<HelpSectionKey> = [
-  "order",
-  "measurement",
-  "profiles",
-  "installation",
-  "repair",
-  "contact",
-];
 
 function sanitizeRegionalText(value?: string | null): string | undefined {
   const trimmed = String(value ?? "").trim();
@@ -176,7 +168,7 @@ export function SiteFooter({ gutter = spacing.md }: Props): JSX.Element | null {
 
   const isLoading = settingsQuery.isLoading;
   const settings = settingsQuery.data ?? {};
-  const brandName = sanitizeRegionalText(settings.brandName) ?? "КанОкна";
+  const brandName = sanitizeRegionalText(settings.brandName) ?? "Канокна";
   const tagline = sanitizeRegionalText(settings.tagline) ?? t("footer.regionTagline");
 
   function openExternal(url: string) {
@@ -196,7 +188,6 @@ export function SiteFooter({ gutter = spacing.md }: Props): JSX.Element | null {
   const phoneUrl = phoneRaw ? buildPhoneUrl(phoneRaw) : "";
   const emailRaw = settings.email?.trim() ?? "";
   const emailUrl = emailRaw ? buildMailtoUrl(emailRaw) : "";
-  const whatsappUrl = settings.whatsapp ? buildWhatsAppUrl(settings.whatsapp) : "";
   const telegramSource = settings.telegram?.trim() || SUPPORT_TELEGRAM_FALLBACK;
   const telegramUrl = buildTelegramUrl(telegramSource);
   const maxRaw = settings.maxUrl?.trim() ?? "";
@@ -227,14 +218,6 @@ export function SiteFooter({ gutter = spacing.md }: Props): JSX.Element | null {
   ].filter((item): item is FooterAction => Boolean(item));
 
   const messengerContacts = [
-    whatsappUrl
-      ? {
-          key: "whatsapp",
-          label: t("contacts.whatsapp"),
-          renderIcon: (active: boolean) => <FontAwesome name="whatsapp" size={18} color={active ? "#25D366" : mutedIconColor} />,
-          onPress: () => openExternal(whatsappUrl),
-        }
-      : null,
     telegramUrl
       ? {
           key: "telegram",
@@ -264,14 +247,9 @@ export function SiteFooter({ gutter = spacing.md }: Props): JSX.Element | null {
   const showContacts = Boolean(hasContacts || isLoading);
   const [contactsExpanded, setContactsExpanded] = useState(showContacts);
   const [contactsTouched, setContactsTouched] = useState(false);
-  const [faqExpanded, setFaqExpanded] = useState(false);
 
   const copyrightText =
     sanitizeRegionalText(settings.copyrightText) ?? `© ${new Date().getFullYear()} ${brandName}`;
-
-  const openHelpSection = (section: HelpSectionKey) => {
-    navigation.navigate("Faq", { section });
-  };
 
   useEffect(() => {
     if (!footerIsMobile) return;
@@ -329,30 +307,12 @@ export function SiteFooter({ gutter = spacing.md }: Props): JSX.Element | null {
         : null}
     </View>
   );
-  const renderHelpLinks = () => (
-    <View style={styles.helpLinks}>
-      {HELP_FOOTER_LINKS.map((section) => (
-        <Pressable
-          key={section}
-          accessibilityRole="link"
-          accessibilityLabel={t(`footer.helpLinks.${section}`)}
-          onPress={() => openHelpSection(section)}
-          hitSlop={6}
-          style={(state) => [styles.helpLinkItem, state.pressed ? styles.textLinkPressed : null]}
-        >
-          <Text style={[styles.helpLinkLabel, { color: theme.colors.text }, webWrapText]}>
-            {t(`footer.helpLinks.${section}`)}
-          </Text>
-        </Pressable>
-      ))}
-    </View>
-  );
 
   return (
     <View
       style={[
         styles.shell,
-        pushToBottom ? ({ marginTop: "auto" } as any) : null,
+        { marginTop: "auto" } as any,
       ]}
     >
       <View
@@ -390,12 +350,15 @@ export function SiteFooter({ gutter = spacing.md }: Props): JSX.Element | null {
                 </>
               ) : (
                 <>
-                  <Text
-                    style={[styles.brand, { color: theme.colors.text }, webWrapText]}
-                    numberOfLines={footerIsStacked ? undefined : 1}
-                  >
-                    {brandName}
-                  </Text>
+                  <View style={styles.brandRow}>
+                    <Image source={require("../../assets/favicon.png")} style={styles.brandLogo as any} resizeMode="contain" />
+                    <Text
+                      style={[styles.brand, { color: theme.colors.text }, webWrapText]}
+                      numberOfLines={footerIsStacked ? undefined : 1}
+                    >
+                      {brandName}
+                    </Text>
+                  </View>
                   {tagline ? (
                     <Text
                       style={[styles.tagline, { color: theme.colors.textMuted }, webWrapText]}
@@ -424,16 +387,6 @@ export function SiteFooter({ gutter = spacing.md }: Props): JSX.Element | null {
                     {renderContactButtons(true)}
                   </FooterAccordionSection>
                 ) : null}
-
-                <FooterAccordionSection
-                  title={t("footer.faqTitle")}
-                  expanded={faqExpanded}
-                  onToggle={() => setFaqExpanded((prev) => !prev)}
-                  borderColor={theme.colors.border}
-                  titleColor={theme.colors.textMuted}
-                >
-                  {renderHelpLinks()}
-                </FooterAccordionSection>
               </View>
             ) : (
               <>
@@ -443,11 +396,6 @@ export function SiteFooter({ gutter = spacing.md }: Props): JSX.Element | null {
                     {renderContactButtons()}
                   </View>
                 ) : null}
-
-                <View style={styles.colFaq}>
-                  <Text style={[styles.colTitle, { color: theme.colors.textMuted }]}>{t("footer.faqTitle")}</Text>
-                  {renderHelpLinks()}
-                </View>
               </>
             )}
           </View>
@@ -513,8 +461,18 @@ function makeStyles(
       width: "100%",
       marginTop: spacing.xl
     },
+    brandRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    brandLogo: {
+      width: 20,
+      height: 20,
+      borderRadius: 5,
+    },
     brand: {
-      ...font(900),
+      fontFamily: "Days",
       fontSize: 16,
       lineHeight: 20,
       letterSpacing: 0.2
@@ -532,14 +490,6 @@ function makeStyles(
       paddingTop: isStacked ? (isMobile ? spacing.lg : spacing.md) : 0,
       borderTopWidth: isStacked ? 1 : 0,
       borderTopColor: theme.colors.border,
-      gap: spacing.sm
-    },
-    colFaq: {
-      flex: isStacked ? 0 : 1,
-      minWidth: isStacked ? 0 : 220,
-      width: isStacked ? "100%" : undefined,
-      maxWidth: "100%",
-      marginTop: isStacked ? 0 : 0,
       gap: spacing.sm
     },
     colTitle: {
@@ -578,18 +528,6 @@ function makeStyles(
     },
     iconPressed: {
       opacity: 0.88
-    },
-    helpLinks: {
-      gap: 6
-    },
-    helpLinkItem: {
-      paddingVertical: 4,
-      ...( { cursor: "pointer" } as object )
-    },
-    helpLinkLabel: {
-      ...font(800),
-      fontSize: 13,
-      lineHeight: 18
     },
     textLinkPressed: {
       opacity: 0.66

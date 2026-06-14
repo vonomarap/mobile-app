@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../services/auth-context";
@@ -23,6 +23,8 @@ export function SupportChatFab(): JSX.Element | null {
   const navigation = useNavigation();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const isMobile = Platform.OS !== "web" || width < theme.layout.desktopNavMinWidth;
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [currentRoute, setCurrentRoute] = useState<RouteName | undefined>(() => {
     const name = (navigation as any).getCurrentRoute?.()?.name;
@@ -35,9 +37,15 @@ export function SupportChatFab(): JSX.Element | null {
       setThreads([]);
       return;
     }
-    return subscribeSupportThreadsForCustomer(user.uid, (nextThreads) => {
-      setThreads(nextThreads);
-    });
+    return subscribeSupportThreadsForCustomer(
+      user.uid,
+      (nextThreads) => {
+        setThreads(nextThreads);
+      },
+      (error) => {
+        console.error("[SupportChatFab] threads subscription error:", error);
+      },
+    );
   }, [user?.uid]);
 
   useEffect(() => {
@@ -53,7 +61,7 @@ export function SupportChatFab(): JSX.Element | null {
     };
   }, [navigation]);
 
-  if (currentRoute === "SupportChat") return null;
+  if (currentRoute === "SupportChat" || currentRoute === "Calculator") return null;
 
   const hasUnread = customerHasUnreadSupport(pickActiveSupportThread(threads));
 
@@ -65,7 +73,9 @@ export function SupportChatFab(): JSX.Element | null {
           styles.wrap,
           {
             right: spacing.md + insets.right,
-            bottom: spacing.md + Math.max(insets.bottom, spacing.sm),
+            bottom: isMobile
+              ? theme.layout.mobileTabBarHeight + spacing.md + insets.bottom
+              : spacing.md + Math.max(insets.bottom, spacing.sm),
           },
         ]}
       >

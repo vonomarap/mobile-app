@@ -1,8 +1,16 @@
-import { ReactNode, useMemo } from "react";
-import { ActivityIndicator, Pressable, StyleProp, StyleSheet, Text, TextStyle, View, ViewStyle } from "react-native";
-import { font } from "../theme/font";
-import { radius, spacing } from "../theme/tokens";
+import React, { ReactNode } from "react";
+import { ActivityIndicator, Pressable, StyleProp, Text, TextStyle, View, ViewStyle } from "react-native";
 import { useTheme } from "../theme/ThemeProvider";
+
+function renderSlot(slot: ReactNode, color: string): ReactNode {
+  if (!React.isValidElement(slot)) return slot;
+  
+  const props = slot.props as any;
+  if ('color' in props && (props.color === "#FFFFFF" || props.color === "#ffffff" || !props.color)) {
+    return React.cloneElement(slot, { color } as any);
+  }
+  return slot;
+}
 
 export function PrimaryButton({
   title,
@@ -28,119 +36,54 @@ export function PrimaryButton({
   textStyle?: StyleProp<TextStyle>;
 }): JSX.Element {
   const theme = useTheme();
-  const styles = useMemo(() => makeStyles(theme.colors), [theme.colors]);
   const isDisabled = disabled || loading;
-  const palette =
-    tone === "soft"
-      ? {
-          backgroundColor: theme.colors.surface,
-          borderColor: theme.colors.border,
-          hoverBackgroundColor: theme.colors.surface2,
-          textColor: textColor ?? theme.colors.primary,
-        }
-      : {
-          backgroundColor: theme.colors.primary,
-          borderColor: theme.colors.primary,
-          hoverBackgroundColor: theme.colors.primary,
-          textColor: textColor ?? "#FFFFFF",
-        };
+
+  const isSoft = tone === "soft";
+
+  const btnClasses = [
+    "flex-row items-center justify-center min-h-[46px] rounded-xl px-4 py-2 border gap-2",
+    isSoft
+      ? "bg-secondary dark:bg-zinc-900 border-border dark:border-zinc-800 active:bg-accent dark:active:bg-zinc-850"
+      : "bg-zinc-950 dark:bg-zinc-50 border-zinc-950 dark:border-zinc-50 active:opacity-90 shadow-sm",
+    isDisabled ? "opacity-55" : "opacity-100",
+  ].filter(Boolean).join(" ");
+
+  const textClasses = [
+    "text-base font-bold",
+  ].join(" ");
+
+  const resolvedTextColor = textColor ?? (
+    isSoft 
+      ? (theme.isDark ? "#fafafa" : "#18181b") 
+      : (theme.isDark ? "#09090b" : "#ffffff")
+  );
 
   return (
     <Pressable
       onPress={onPress}
       disabled={isDisabled}
       accessibilityRole="button"
-      style={(state) => {
-        const pressed = state.pressed;
-        const hovered = (state as unknown as { hovered?: boolean }).hovered;
-
-        return [
-          styles.button,
-          tone === "soft" ? styles.soft : styles.primary,
-          {
-            backgroundColor: hovered && !isDisabled ? palette.hoverBackgroundColor : palette.backgroundColor,
-            borderColor: palette.borderColor,
-          },
-          tone === "primary" && !isDisabled ? styles.primaryShadow : null,
-          buttonStyle,
-          hovered && !isDisabled ? styles.hovered : null,
-          pressed && !isDisabled ? styles.pressed : null,
-          isDisabled ? styles.disabled : null
-        ];
-      }}
+      className={btnClasses}
+      style={buttonStyle}
     >
-      {leftSlot ? <View style={styles.slot}>{leftSlot}</View> : null}
+      {leftSlot ? <View className="items-center justify-center">{renderSlot(leftSlot, resolvedTextColor)}</View> : null}
       {loading ? (
         <ActivityIndicator
           size="small"
-          color={textColor ?? (tone === "soft" ? theme.colors.primary : "#FFFFFF")}
-          style={styles.spinner}
+          color={resolvedTextColor}
+          className="mr-1"
         />
       ) : null}
       <Text
+        className={textClasses}
         style={[
-          styles.text,
-          { color: palette.textColor },
+          { color: resolvedTextColor },
           textStyle
         ]}
       >
         {title}
       </Text>
-      {rightSlot ? <View style={styles.slot}>{rightSlot}</View> : null}
+      {rightSlot ? <View className="items-center justify-center">{renderSlot(rightSlot, resolvedTextColor)}</View> : null}
     </Pressable>
   );
-}
-
-function makeStyles(colors: { primary: string; primarySoft: string; border: string }): ReturnType<typeof StyleSheet.create> {
-  return StyleSheet.create({
-    button: {
-      minHeight: 46,
-      borderRadius: radius.sm,
-      paddingHorizontal: spacing.md,
-      paddingVertical: 10,
-      alignItems: "center",
-      justifyContent: "center",
-      flexDirection: "row",
-      gap: spacing.sm,
-      borderWidth: 1,
-      borderColor: "transparent",
-      // Remove browser focus ring/outline on web after click/tap.
-      ...( { outlineStyle: "none", outlineWidth: 0, WebkitTapHighlightColor: "transparent" } as object ),
-      ...( { cursor: "pointer" } as object )
-    },
-    primary: {
-      backgroundColor: colors.primary
-    },
-    soft: {
-      backgroundColor: "#FFFFFF",
-      borderColor: colors.border
-    },
-    primaryShadow: {
-      shadowColor: "#000000",
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.12,
-      shadowRadius: 10,
-      elevation: 3,
-    },
-    hovered: {
-      opacity: 1
-    },
-    pressed: {
-      opacity: 0.9
-    },
-    disabled: {
-      opacity: 0.55
-    },
-    text: {
-      ...font(800),
-      fontSize: 16,
-    },
-    slot: {
-      alignItems: "center",
-      justifyContent: "center"
-    },
-    spinner: {
-      marginRight: -4
-    }
-  });
 }

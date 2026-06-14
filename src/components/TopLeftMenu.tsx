@@ -1,6 +1,6 @@
 import type { ComponentProps } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AccessibilityInfo, Animated, Easing, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { AccessibilityInfo, Animated, Easing, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
@@ -25,6 +25,13 @@ import { PrimaryButton } from "./PrimaryButton";
 
 type RouteName = keyof RootStackParamList;
 
+type TabItem = {
+  route: RouteName;
+  label: string;
+  icon: ComponentProps<typeof Ionicons>["name"];
+  activeIcon: ComponentProps<typeof Ionicons>["name"];
+};
+
 export function TopLeftMenu(): JSX.Element {
   const theme = useTheme();
   const { toggle: toggleTheme } = useThemeControls();
@@ -35,13 +42,13 @@ export function TopLeftMenu(): JSX.Element {
   const { user } = useAuth();
   const { currency } = useCurrencyControls();
   const { ready: cartReady, items: cartItems, removeItem, itemsSubtotal } = useCart();
-  const [visible, setVisible] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
-  const progress = useRef(new Animated.Value(0)).current;
   const accountProgress = useRef(new Animated.Value(0)).current;
   const cartProgress = useRef(new Animated.Value(0)).current;
+  const moreProgress = useRef(new Animated.Value(0)).current;
   const accountTriggerRef = useRef<any>(null);
   const cartTriggerRef = useRef<any>(null);
   const accountPanelRef = useRef<any>(null);
@@ -54,16 +61,11 @@ export function TopLeftMenu(): JSX.Element {
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const desktopNavEnabled = Platform.OS === "web" && width >= theme.layout.desktopNavMinWidth;
   const isNavGlass = useNavGlass();
-  const top = insets.top + spacing.sm;
-  const right = insets.right + spacing.sm;
   const accountPopoverWidth = Math.min(320, width - spacing.md * 2);
   const cartPopoverWidth = Math.min(380, width - spacing.md * 2);
-  const menuPopoverWidth = Math.min(304, width - spacing.md * 2);
-  const mobilePopoverTop = top + 48 + spacing.sm;
-  const mobilePopoverRight = right;
-  const mobileCartPopoverHeight = Math.max(300, Math.min(520, height - mobilePopoverTop - spacing.md));
 
   const navItems: Array<{ route: RouteName; label: string; icon: ComponentProps<typeof Ionicons>["name"] }> = [
+    { route: "Home", label: t("tabs.home", { defaultValue: "Главная" }), icon: "home-outline" },
     { route: "Catalog", label: t("tabs.catalog"), icon: "grid-outline" },
     { route: "Moskitki", label: t("tabs.moskitki"), icon: "apps-outline" },
     { route: "Gallery", label: t("tabs.gallery"), icon: "images-outline" },
@@ -71,6 +73,26 @@ export function TopLeftMenu(): JSX.Element {
     { route: "Contacts", label: t("tabs.contacts"), icon: "call-outline" }
   ];
 
+  const tabItems: TabItem[] = useMemo(() => [
+    { route: "Home",       label: t("tabs.home", { defaultValue: "Главная" }), icon: "home-outline",      activeIcon: "home" },
+    { route: "Catalog",    label: t("tabs.catalog"),                            icon: "albums-outline",    activeIcon: "albums" },
+    { route: "Moskitki",   label: t("tabs.moskitki"),                           icon: "grid-outline",      activeIcon: "grid" },
+    { route: "Calculator", label: t("tabs.calculator"),                         icon: "calculator-outline", activeIcon: "calculator" },
+    { route: "Cart",       label: t("tabs.cart"),                               icon: "cart-outline",      activeIcon: "cart" }
+  ], [t]);
+
+  const moreItems: Array<{ route: RouteName; label: string; icon: ComponentProps<typeof Ionicons>["name"] }> = useMemo(() => [
+    { route: "Account", label: t("tabs.account"), icon: "person-circle-outline" },
+    { route: "Gallery", label: t("tabs.gallery"), icon: "images-outline" },
+    { route: "Contacts", label: t("tabs.contacts"), icon: "call-outline" },
+    { route: "SupportChat", label: t("tabs.help", { defaultValue: "Помощь" }), icon: "help-circle-outline" }
+  ], [t]);
+
+  const moreSheetOpacity = moreProgress.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
+  const moreSlideX = moreProgress.interpolate({ inputRange: [0, 1], outputRange: [width, 0] });
+  const moreIconRotate = moreProgress.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "90deg"] });
+  const moreIconMenuOpacity = moreProgress.interpolate({ inputRange: [0, 0.4], outputRange: [1, 0], extrapolate: "clamp" });
+  const moreIconCloseOpacity = moreProgress.interpolate({ inputRange: [0.15, 1], outputRange: [0, 1], extrapolate: "clamp" });
   const cartTooltip = cartItems.length ? `${t("cart.open")} (${cartItems.length})` : t("cart.open");
   const currentLang: LangCode = getCurrentLanguage();
   const orderMetaText = t("calculator.orderItemsCount", { defaultValue: "Позиции: {{count}}", count: cartItems.length });
@@ -115,14 +137,6 @@ export function TopLeftMenu(): JSX.Element {
   const cartPanelOpacity = cartProgress.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
   const cartPanelTranslateY = cartProgress.interpolate({ inputRange: [0, 1], outputRange: [-6, 0] });
   const cartPanelScale = cartProgress.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] });
-
-  const backdropOpacity = progress.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
-  const panelOpacity = progress.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
-  const panelTranslateY = progress.interpolate({ inputRange: [0, 1], outputRange: [-6, 0] });
-  const panelScale = progress.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] });
-  const iconRotate = progress.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "90deg"] });
-  const iconMenuOpacity = progress.interpolate({ inputRange: [0, 0.4], outputRange: [1, 0], extrapolate: "clamp" });
-  const iconCloseOpacity = progress.interpolate({ inputRange: [0.15, 1], outputRange: [0, 1], extrapolate: "clamp" });
 
   function animateOpen(setOpen: (value: boolean) => void, animatedValue: Animated.Value, duration: number): void {
     setOpen(true);
@@ -177,13 +191,29 @@ export function TopLeftMenu(): JSX.Element {
     animateImmediate(setCartOpen, cartProgress);
   }
 
-  function closeMenuImmediate(): void {
-    animateImmediate(setVisible, progress);
+  function closeMoreImmediate(): void {
+    animateImmediate(setMoreOpen, moreProgress);
+  }
+
+  function openMore(): void {
+    animateOpen(setMoreOpen, moreProgress, 260);
+  }
+
+  function closeMore(): void {
+    animateClose(moreOpen, setMoreOpen, moreProgress, 200);
+  }
+
+  function toggleMore(): void {
+    if (moreOpen) {
+      closeMore();
+    } else {
+      openMore();
+    }
   }
 
   function openAccountMenu(): void {
     closeCartPanelImmediate();
-    closeMenuImmediate();
+    closeMoreImmediate();
     if (accountOpen) return;
     animateOpen(setAccountOpen, accountProgress, 260);
   }
@@ -194,24 +224,13 @@ export function TopLeftMenu(): JSX.Element {
 
   function openCartPanel(): void {
     closeAccountMenuImmediate();
-    closeMenuImmediate();
+    closeMoreImmediate();
     if (cartOpen) return;
     animateOpen(setCartOpen, cartProgress, 280);
   }
 
   function closeCartPanel(): void {
     animateClose(cartOpen, setCartOpen, cartProgress, 220);
-  }
-
-  function openMenu(): void {
-    closeAccountMenuImmediate();
-    closeCartPanelImmediate();
-    if (visible) return;
-    animateOpen(setVisible, progress, 260);
-  }
-
-  function closeMenu(): void {
-    animateClose(visible, setVisible, progress, 200);
   }
 
   useEffect(() => {
@@ -235,7 +254,7 @@ export function TopLeftMenu(): JSX.Element {
   useEffect(() => {
     closeAccountMenuImmediate();
     closeCartPanelImmediate();
-    closeMenuImmediate();
+    closeMoreImmediate();
   }, [desktopNavEnabled]);
 
   useEffect(() => {
@@ -274,27 +293,6 @@ export function TopLeftMenu(): JSX.Element {
       doc.removeEventListener?.("scroll", close, true);
     };
   }, [accountOpen, cartOpen]);
-
-  useEffect(() => {
-    if (!visible) return;
-    if (Platform.OS !== "web") return;
-
-    const win = (globalThis as any).window as any;
-    const doc = (globalThis as any).document as any;
-    if (!win || !doc) return;
-
-    const close = () => closeMenu();
-
-    win.addEventListener?.("wheel", close, { passive: true });
-    win.addEventListener?.("touchmove", close, { passive: true });
-    doc.addEventListener?.("scroll", close, true);
-
-    return () => {
-      win.removeEventListener?.("wheel", close);
-      win.removeEventListener?.("touchmove", close);
-      doc.removeEventListener?.("scroll", close, true);
-    };
-  }, [visible, reduceMotion]);
 
   useEffect(() => {
     if (!desktopNavEnabled) return;
@@ -339,15 +337,17 @@ export function TopLeftMenu(): JSX.Element {
   const openRoute = (route: RouteName) => {
     closeAccountMenuImmediate();
     closeCartPanelImmediate();
-    closeMenuImmediate();
-    if (route === currentRoute) return;
+    closeMoreImmediate();
+    if (route === currentRoute) {
+      if (moreOpen) closeMore();
+      return;
+    }
     (navigation as any).navigate(route);
   };
 
   const openCartPage = () => {
     closeAccountMenuImmediate();
     closeCartPanelImmediate();
-    closeMenuImmediate();
 
     if (Platform.OS === "web") {
       const location = (globalThis as any).location as { pathname?: string; assign?: (url: string) => void; href?: string } | undefined;
@@ -406,7 +406,6 @@ export function TopLeftMenu(): JSX.Element {
   const openCalculatorFromCart = () => {
     closeAccountMenuImmediate();
     closeCartPanelImmediate();
-    closeMenuImmediate();
     if (currentRoute === "Calculator") return;
     (navigation as any).navigate("Calculator");
   };
@@ -656,9 +655,12 @@ export function TopLeftMenu(): JSX.Element {
           <View style={[styles.desktopInner, { maxWidth: theme.layout.maxWidth }]} pointerEvents="box-none">
             <Card variant={isNavGlass ? "glass" : "solid"} blurIntensity={24} padded={false} elevated style={styles.desktopCard}>
               <View style={styles.desktopContent}>
-                <Text style={styles.desktopBrand} numberOfLines={1}>
-                  КанОкна | Краснодарский край
-                </Text>
+<View style={styles.desktopBrandRow}>
+                  <Image source={require("../../assets/favicon.png")} style={styles.brandLogo as any} resizeMode="contain" />
+                  <Text style={styles.desktopBrand} numberOfLines={1}>
+                    Канокна | Краснодарский край
+                  </Text>
+                </View>
 
                 <View style={styles.desktopLinks}>
                   {navItems.map((item) => {
@@ -696,6 +698,8 @@ export function TopLeftMenu(): JSX.Element {
                       onHoverIn={onDesktopCartHoverIn}
                       onFocus={onDesktopCartHoverIn}
                       enableTooltip={false}
+                      size={42}
+                      iconSize={20}
                     />
                   </View>
 
@@ -714,7 +718,7 @@ export function TopLeftMenu(): JSX.Element {
                         state.pressed ? styles.pillPressed : null
                       ]}
                     >
-                      <Ionicons name="person-circle-outline" size={18} color={theme.colors.primary} />
+                      <Ionicons name="person-circle-outline" size={20} color={accountOpen ? theme.colors.text : theme.colors.textMuted} />
                     </Pressable>
                   </View>
                 </View>
@@ -752,156 +756,189 @@ export function TopLeftMenu(): JSX.Element {
     );
   }
 
+  const tabBarBottom = insets.bottom;
+
+  const moreRoutes = new Set(moreItems.map((m) => m.route));
+  const isMoreActive = !!(currentRoute && moreRoutes.has(currentRoute));
+
   return (
     <>
-      <View style={[styles.root, { top, right }]} pointerEvents="box-none">
-        <IconButton
-          icon="cart-outline"
-          accessibilityLabel={cartTooltip}
-          selected={currentRoute === "Cart" || cartOpen}
-          badgeCount={cartItems.length}
-          onPress={openCart}
-          size={48}
-          iconSize={24}
-          enableTooltip={false}
-        />
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Account"
-          accessibilityState={{ expanded: accountOpen }}
-          onPress={() => (accountOpen ? closeAccountMenu() : openAccountMenu())}
-          style={(state) => [
-            styles.pill,
-            accountOpen ? styles.pillActive : null,
-            (state as unknown as { hovered?: boolean }).hovered ? styles.pillHovered : null,
-            state.pressed ? styles.pillPressed : null
+      {currentRoute !== "SupportChat" ? (
+        <View
+          style={[
+            styles.topBar,
+            {
+              top: 0,
+              paddingTop: insets.top,
+              backgroundColor: theme.colors.surface,
+              borderBottomColor: theme.colors.border,
+            },
+            ...(Platform.OS === "web"
+              ? ([
+                  {
+                    backdropFilter: "blur(20px)",
+                    WebkitBackdropFilter: "blur(20px)",
+                    backgroundColor: theme.isDark ? "rgba(22,22,23,0.88)" : "rgba(255,255,255,0.88)"
+                  }
+                ] as object[])
+              : [])
           ]}
         >
-          <Ionicons name="person-circle-outline" size={26} color={theme.colors.text} />
-        </Pressable>
+          <View style={styles.topBarContent}>
+            <View style={styles.topBarBrandRow}>
+              <Image source={require("../../assets/favicon.png")} style={styles.brandLogoMobile as any} resizeMode="contain" />
+              <Text style={styles.topBarBrand} numberOfLines={1}>
+                Канокна
+              </Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded: moreOpen }}
+              accessibilityLabel={t("common.more", { defaultValue: "Ещё" })}
+              onPress={toggleMore}
+              style={(state) => [
+                styles.topBarBurger,
+                (state as unknown as { hovered?: boolean }).hovered ? styles.menuPillHovered : null,
+                state.pressed ? styles.menuPillPressed : null
+              ]}
+            >
+              <Animated.View style={[styles.burgerIconWrap, { transform: [{ rotateZ: moreIconRotate }] }]}>
+                <Animated.View style={[styles.burgerIconLayer, { opacity: moreIconMenuOpacity }]}>
+                  <Ionicons name="menu" size={26} color={theme.colors.text} />
+                </Animated.View>
+                <Animated.View style={[styles.burgerIconLayer, { opacity: moreIconCloseOpacity }]}>
+                  <Ionicons name="close" size={26} color={theme.colors.primary} />
+                </Animated.View>
+              </Animated.View>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Menu"
-          onPress={() => (visible ? closeMenu() : openMenu())}
-          style={(state) => [
-            styles.pill,
-            (state as unknown as { hovered?: boolean }).hovered ? styles.pillHovered : null,
-            state.pressed ? styles.pillPressed : null
-          ]}
-        >
-          <Animated.View style={[styles.iconWrap, { transform: [{ rotateZ: iconRotate }] }]}> 
-            <Animated.View style={[styles.iconLayer, { opacity: iconMenuOpacity }]}> 
-              <Ionicons name="menu" size={24} color={theme.colors.text} />
-            </Animated.View>
-            <Animated.View style={[styles.iconLayer, { opacity: iconCloseOpacity }]}> 
-              <Ionicons name="close" size={24} color={theme.colors.text} />
-            </Animated.View>
-          </Animated.View>
-        </Pressable>
+      <View
+        style={[
+          styles.tabBar,
+          {
+            bottom: tabBarBottom,
+            backgroundColor: theme.colors.tabBarBg,
+            borderColor: theme.colors.border,
+            ...(Platform.OS === "web"
+              ? ({
+                  backdropFilter: "blur(20px)",
+                  WebkitBackdropFilter: "blur(20px)",
+                  backgroundColor: theme.isDark ? "rgba(34,34,37,0.92)" : "rgba(232,232,235,0.92)"
+                } as object)
+              : null)
+          }
+        ]}
+      >
+        {tabItems.map((tab) => {
+          const isActive = tab.route === currentRoute;
+          const isCart = tab.route === "Cart";
+          const iconColor = isActive ? theme.colors.primary : theme.colors.textMuted;
+          const iconName = isActive ? tab.activeIcon : tab.icon;
+
+          return (
+            <Pressable
+              key={tab.route}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isActive }}
+              accessibilityLabel={tab.label}
+              onPress={() => openRoute(tab.route)}
+              style={(state) => [
+                styles.tabItem,
+                isActive ? styles.tabItemActive : null,
+                state.pressed ? styles.tabItemPressed : null
+              ]}
+            >
+              <View style={styles.tabIconWrap}>
+                <Ionicons name={iconName} size={22} color={iconColor} />
+                {isCart && cartItems.length > 0 ? (
+                  <View style={[styles.tabBadge, { backgroundColor: theme.colors.primary }]}>
+                    <Text style={styles.tabBadgeText}>
+                      {cartItems.length > 99 ? "99+" : cartItems.length}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+              <Text
+                style={[
+                  styles.tabLabel,
+                  { color: iconColor }
+                ]}
+                numberOfLines={1}
+              >
+                {tab.label}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
 
-      <Modal transparent animationType="none" visible={accountOpen} onRequestClose={closeAccountMenu}>
-        <View style={styles.modalRoot}>
-          {renderSharedBackdrop(accountBackdropOpacity)}
-          <Pressable style={styles.backdropPress} onPress={closeAccountMenu} />
-          <Animated.View
-            style={[
-              styles.accountMenuWrap,
-              { top: mobilePopoverTop, right: mobilePopoverRight, width: accountPopoverWidth },
-              { opacity: accountPanelOpacity, transform: [{ translateY: accountPanelTranslateY }, { scale: accountPanelScale }] }
-            ]}
-          >
-            {renderAccountCard()}
-          </Animated.View>
-        </View>
-      </Modal>
-
-      <Modal transparent animationType="none" visible={cartOpen} onRequestClose={closeCartPanel}>
-        <View style={styles.modalRoot}>
-          {renderSharedBackdrop(cartBackdropOpacity)}
-          <View style={styles.backdropPress} />
-          <Animated.View
-            style={[
-              styles.cartDrawerWrap,
-              { top: mobilePopoverTop, right: mobilePopoverRight, width: cartPopoverWidth, height: mobileCartPopoverHeight },
-              { opacity: cartPanelOpacity, transform: [{ translateY: cartPanelTranslateY }, { scale: cartPanelScale }] }
-            ]}
-          >
-            {renderCartCard()}
-          </Animated.View>
-        </View>
-      </Modal>
-
-      <Modal transparent animationType="none" visible={visible} onRequestClose={closeMenu}>
-        <View style={styles.modalRoot}>
-          {renderSharedBackdrop(backdropOpacity)}
-          <Pressable style={styles.backdropPress} onPress={closeMenu} />
-          <Animated.View
-            style={[
-              styles.menuWrap,
-              { top: mobilePopoverTop, right, width: menuPopoverWidth },
-              { opacity: panelOpacity, transform: [{ translateY: panelTranslateY }, { scale: panelScale }] }
-            ]}
-          >
-            <Card variant="solid" padded={false} elevated={false} style={styles.menuCard}>
-              <View style={styles.popoverHeader}>
-                <View style={styles.popoverHeaderCopy}>
-                  <Text style={styles.popoverTitle} numberOfLines={1}>
-                    {t("common.menu")}
-                  </Text>
-                  <Text style={styles.popoverSubtitle} numberOfLines={1}>
-                    КанОкна | Краснодарский край
-                  </Text>
-                </View>
-              </View>
-              <Animated.View
-                style={[
-                  styles.menuList,
-                  {
-                    opacity: progress.interpolate({ inputRange: [0.08, 1], outputRange: [0, 1], extrapolate: "clamp" }),
-                    transform: [
-                      {
-                        translateY: progress.interpolate({
-                          inputRange: [0.08, 1],
-                          outputRange: [6, 0],
-                          extrapolate: "clamp"
-                        })
-                      }
-                    ]
-                  }
-                ]}
-              >
-              {navItems.map((item, idx) => {
-                const start = 0.10 + idx * 0.04;
-                const itemOpacity = progress.interpolate({
-                  inputRange: [start, 1],
-                  outputRange: [0, 1],
-                  extrapolate: "clamp"
-                });
-                const itemTranslateX = progress.interpolate({
-                  inputRange: [start, 1],
-                  outputRange: [8, 0],
-                  extrapolate: "clamp"
-                });
-
+      {moreOpen ? (
+        <Animated.View
+          style={[
+            styles.moreMenuFull,
+            {
+              backgroundColor: theme.colors.surface,
+            },
+            {
+              opacity: moreSheetOpacity,
+              transform: [{ translateX: moreSlideX }]
+            }
+          ]}
+        >
+          <View style={styles.moreMenuContent}>
+            <View style={[styles.moreMenuList, { paddingTop: insets.top + theme.layout.mobileTopBarHeight + spacing.md }]}>
+              {moreItems.map((item) => {
+                const selected = item.route === currentRoute;
                 return (
-                  <Animated.View key={item.route} style={{ opacity: itemOpacity, transform: [{ translateX: itemTranslateX }] }}>
-                    <MenuItem
-                      icon={item.icon}
-                      label={item.label}
-                      selected={item.route === currentRoute}
-                      onPress={() => openRoute(item.route)}
-                    />
-                  </Animated.View>
+                  <MenuItem
+                    key={item.route}
+                    icon={item.icon}
+                    label={item.label}
+                    selected={selected}
+                    onPress={() => openRoute(item.route)}
+                  />
                 );
               })}
-              </Animated.View>
-            </Card>
-          </Animated.View>
-        </View>
-      </Modal>
+            </View>
+
+            <View style={[styles.moreMenuSettings, { paddingBottom: insets.bottom + spacing.md }]}>
+              <View style={[styles.menuDivider, { backgroundColor: theme.colors.border }]} />
+              <View style={styles.moreMenuSettingsRow}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={themeMenuLabel}
+                  onPress={toggleTheme}
+                  style={(state) => [
+                    styles.settingsPill,
+                    { backgroundColor: theme.colors.surface2 },
+                    (state as unknown as { hovered?: boolean }).hovered ? styles.settingsPillHovered : null,
+                    state.pressed ? styles.settingsPillPressed : null
+                  ]}
+                >
+                  <Ionicons name={themeMenuIcon} size={16} color={theme.colors.primary} />
+                </Pressable>
+
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`${t("common.language", { defaultValue: "Язык" })}: ${languageToggleLabel}`}
+                  onPress={() => void setLanguage(nextLang)}
+                  style={(state) => [
+                    styles.settingsPill,
+                    { backgroundColor: theme.colors.surface2 },
+                    (state as unknown as { hovered?: boolean }).hovered ? styles.settingsPillHovered : null,
+                    state.pressed ? styles.settingsPillPressed : null
+                  ]}
+                >
+                  <Text style={styles.settingsPillLabel}>{languageToggleLabel}</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Animated.View>
+      ) : null}
     </>
   );
 }
@@ -982,10 +1019,26 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
       gap: spacing.md
     },
     desktopBrand: {
-      ...font(900),
-      fontSize: 15,
+      fontFamily: "Days",
+      fontSize: 17,
       letterSpacing: 0,
       color: theme.colors.text
+    },
+    desktopBrandRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      flexShrink: 0,
+    },
+    brandLogo: {
+      width: 30,
+      height: 30,
+      borderRadius: 7,
+    },
+    brandLogoMobile: {
+      width: 28,
+      height: 28,
+      borderRadius: 7,
     },
     desktopLinks: {
       flex: 1,
@@ -998,34 +1051,31 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
     desktopLink: {
       paddingHorizontal: 14,
       height: 38,
-      borderRadius: 10,
+      borderRadius: 8,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
-      borderWidth: 1,
-      borderColor: "transparent",
+      backgroundColor: "transparent",
       ...({ outlineStyle: "none", outlineWidth: 0, WebkitTapHighlightColor: "transparent" } as object),
       ...({ cursor: "pointer" } as object)
     },
     desktopLinkSelected: {
-      backgroundColor: theme.colors.surface,
-      borderColor: theme.colors.primary
+      backgroundColor: theme.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.05)"
     },
     desktopLinkHovered: {
-      backgroundColor: theme.colors.surface,
-      borderColor: theme.colors.border
+      backgroundColor: theme.isDark ? "rgba(255, 255, 255, 0.04)" : "rgba(0, 0, 0, 0.025)"
     },
     desktopLinkPressed: {
       opacity: 0.92
     },
     desktopLinkText: {
-      ...font(900),
-      fontSize: 13,
+      ...font(700),
+      fontSize: 14,
       letterSpacing: 0,
       color: theme.colors.textMuted
     },
     desktopLinkTextSelected: {
-      color: theme.colors.primary
+      color: theme.colors.text
     },
     desktopControls: {
       flexDirection: "row",
@@ -1033,30 +1083,9 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
       gap: spacing.sm,
       flexShrink: 0
     },
-    root: {
-      position: "absolute",
-      flexDirection: "row",
-      alignItems: "center",
-      gap: spacing.sm,
-      zIndex: 50,
-      elevation: 20
-    },
-    pill: {
-      width: 48,
-      height: 48,
-      borderRadius: 8,
-      backgroundColor: theme.colors.surface,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      alignItems: "center",
-      justifyContent: "center",
-      ...({ outlineStyle: "none", outlineWidth: 0, WebkitTapHighlightColor: "transparent" } as object),
-      ...({ cursor: "pointer" } as object),
-      ...(theme.shadow.sm as object)
-    },
     controlPill: {
-      width: 38,
-      height: 38,
+      width: 40,
+      height: 40,
       borderRadius: 8,
       backgroundColor: theme.colors.surface,
       borderWidth: 1,
@@ -1066,63 +1095,78 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
       ...({ outlineStyle: "none", outlineWidth: 0, WebkitTapHighlightColor: "transparent" } as object),
       ...({ cursor: "pointer" } as object)
     },
-    iconWrap: {
-      width: 24,
-      height: 24,
-      alignItems: "center",
-      justifyContent: "center"
-    },
-    iconLayer: {
-      position: "absolute",
-      left: 0,
-      top: 0
-    },
-    pillHovered: {
-      borderColor: theme.colors.focus
-    },
-    pillPressed: {
-      opacity: 0.96,
+    controlPillActive: {
+      borderColor: theme.isDark ? "#fafafa" : "#18181b",
       backgroundColor: theme.colors.surface2
     },
-    pillActive: {
-      borderColor: theme.colors.primary,
-      backgroundColor: theme.colors.primarySoft
+    pillHovered: {
+      borderColor: theme.isDark ? "rgba(255, 255, 255, 0.25)" : "rgba(0, 0, 0, 0.15)",
+      backgroundColor: theme.colors.surface2
     },
-    controlPillActive: {
-      borderColor: theme.colors.primary,
-      backgroundColor: theme.colors.primarySoft
-    },
-    modalRoot: {
-      flex: 1
+    pillPressed: {
+      opacity: 0.92,
+      backgroundColor: theme.colors.surface2
     },
     backdrop: {
       ...StyleSheet.absoluteFillObject
     },
-    backdropPress: {
-      ...StyleSheet.absoluteFillObject
+    modalRoot: {
+      flex: 1
     },
-    menuWrap: {
+    moreMenuFull: {
       position: "absolute",
-      ...(theme.shadow.md as object)
-    },
-    menuCard: {
+      top: 0,
+      right: 0,
+      bottom: 0,
       width: "100%",
-      borderRadius: 8,
-      overflow: "hidden",
-      paddingBottom: spacing.xs
+      zIndex: 70,
+      elevation: 40,
     },
-    menuList: {
+    moreMenuList: {
       paddingHorizontal: spacing.sm,
-      paddingBottom: spacing.sm,
       gap: 4
+    },
+    moreMenuContent: {
+      flex: 1,
+      justifyContent: "space-between",
+    },
+    moreMenuSettings: {
+      paddingHorizontal: spacing.md,
+      paddingTop: spacing.sm,
+      gap: spacing.sm,
+    },
+    moreMenuSettingsRow: {
+      flexDirection: "row",
+      justifyContent: "flex-end",
+      alignItems: "center",
+      gap: spacing.sm,
+    },
+    settingsPill: {
+      height: 34,
+      paddingHorizontal: 10,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      alignItems: "center",
+      justifyContent: "center",
+      ...({ outlineStyle: "none", outlineWidth: 0, WebkitTapHighlightColor: "transparent" } as object),
+      ...({ cursor: "pointer" } as object)
+    },
+    settingsPillHovered: {
+      borderColor: theme.colors.focus
+    },
+    settingsPillPressed: {
+      opacity: 0.92
+    },
+    settingsPillLabel: {
+      ...font(800),
+      fontSize: 12,
+      letterSpacing: 0,
+      color: theme.colors.primary
     },
     accountMenuWrap: {
       position: "absolute",
       ...(theme.shadow.md as object)
-    },
-    desktopPopoverHoverZone: {
-      width: "100%",
-      height: "100%"
     },
     accountMenuCard: {
       width: "100%",
@@ -1358,7 +1402,7 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
       justifyContent: "center"
     },
     menuIconWrapSelected: {
-      backgroundColor: theme.colors.primarySoft
+      backgroundColor: "transparent"
     },
     menuIconWrapDanger: {
       backgroundColor: theme.colors.surface2
@@ -1371,15 +1415,135 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
       color: theme.colors.text
     },
     menuItemSelected: {
-      backgroundColor: theme.colors.surface,
-      borderColor: theme.colors.primary
+      backgroundColor: theme.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.05)",
+      borderColor: "transparent"
     },
     menuItemHovered: {
-      backgroundColor: theme.colors.surface2,
-      borderColor: theme.colors.border
+      backgroundColor: theme.isDark ? "rgba(255, 255, 255, 0.04)" : "rgba(0, 0, 0, 0.025)",
+      borderColor: "transparent"
     },
     menuItemPressed: {
       opacity: 0.96
+    },
+    tabBar: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      height: theme.layout.mobileTabBarHeight,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-around",
+      borderTopWidth: StyleSheet.hairlineWidth,
+      zIndex: 60,
+      elevation: 30,
+      ...({ outlineStyle: "none" } as object)
+    },
+    menuPillActive: {
+      borderColor: theme.colors.primary,
+      backgroundColor: theme.colors.primarySoft
+    },
+    menuPillHovered: {
+      borderColor: theme.colors.focus
+    },
+    menuPillPressed: {
+      opacity: 0.96,
+      backgroundColor: theme.colors.surface2
+    },
+    topBar: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      zIndex: 80,
+      elevation: 45,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    topBarContent: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      height: theme.layout.mobileTopBarHeight,
+      paddingHorizontal: spacing.md,
+    },
+    topBarBrandRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    topBarBrand: {
+      fontFamily: "Days",
+      fontSize: 17,
+      letterSpacing: 0,
+      color: theme.colors.text
+    },
+    topBarBurger: {
+      width: 52,
+      height: 52,
+      borderRadius: 8,
+      backgroundColor: "transparent",
+      alignItems: "center",
+      justifyContent: "center",
+      ...({ outlineStyle: "none", outlineWidth: 0, WebkitTapHighlightColor: "transparent" } as object),
+      ...({ cursor: "pointer" } as object)
+    },
+    burgerIconWrap: {
+      width: 26,
+      height: 26,
+      alignItems: "center",
+      justifyContent: "center"
+    },
+    burgerIconLayer: {
+      position: "absolute",
+      left: 0,
+      top: 0,
+      width: 26,
+      height: 26,
+      alignItems: "center",
+      justifyContent: "center"
+    },
+    tabItem: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 2,
+      height: theme.layout.mobileTabBarHeight,
+      ...({ outlineStyle: "none", outlineWidth: 0, WebkitTapHighlightColor: "transparent" } as object),
+      ...({ cursor: "pointer" } as object)
+    },
+    tabItemActive: {
+    },
+    tabItemPressed: {
+      opacity: 0.85
+    },
+    tabIconWrap: {
+      position: "relative",
+      width: 28,
+      height: 28,
+      alignItems: "center",
+      justifyContent: "center"
+    },
+    tabLabel: {
+      ...font(700),
+      fontSize: 10,
+      letterSpacing: 0.2,
+      lineHeight: 12
+    },
+    tabBadge: {
+      position: "absolute",
+      top: -4,
+      right: -8,
+      minWidth: 16,
+      height: 16,
+      borderRadius: 8,
+      paddingHorizontal: 4,
+      alignItems: "center",
+      justifyContent: "center"
+    },
+    tabBadgeText: {
+      ...font(800),
+      fontSize: 9,
+      lineHeight: 12,
+      color: "#FFFFFF",
+      letterSpacing: 0
     }
   });
 }

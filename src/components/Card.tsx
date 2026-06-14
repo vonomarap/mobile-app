@@ -1,8 +1,6 @@
 import { PropsWithChildren } from "react";
-import { Platform, StyleProp, StyleSheet, View, ViewStyle } from "react-native";
+import { Platform, StyleProp, View, ViewStyle } from "react-native";
 import { BlurView } from "expo-blur";
-import { radius, spacing } from "../theme/tokens";
-import { useTheme } from "../theme/ThemeProvider";
 
 type Props = PropsWithChildren<{
   style?: StyleProp<ViewStyle>;
@@ -20,66 +18,47 @@ export function Card({
   variant = "glass",
   blurIntensity = 22
 }: Props): JSX.Element {
-  const theme = useTheme();
-
-  const flattened = StyleSheet.flatten(style) as ViewStyle | undefined;
-  const borderRadius = flattened?.borderRadius ?? radius.md;
-
-  const padding = padded ? spacing.md : 0;
-
   const isGlass = variant === "glass";
-  const glassBg = theme.isDark ? "rgba(22,22,23,0.60)" : "rgba(255,255,255,0.72)";
-  const glassOverlay = theme.isDark ? "rgba(22,22,23,0.26)" : "rgba(255,255,255,0.26)";
-  const glassBorder = theme.isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.06)";
+  
+  // Tailwind styles for shadcn-style card
+  const containerClasses = [
+    "border rounded-xl",
+    isGlass 
+      ? "border-border/40 bg-white/70 dark:bg-zinc-900/60" 
+      : "border-border bg-card dark:bg-zinc-950",
+    padded ? "p-4" : "p-0",
+    elevated ? "shadow-sm" : "",
+  ].filter(Boolean).join(" ");
+
+  if (isGlass && Platform.OS !== "web") {
+    return (
+      <View className={containerClasses} style={style}>
+        <View className="absolute inset-0 rounded-xl overflow-hidden">
+          <BlurView
+            tint={Platform.OS === "ios" ? "default" : "light"}
+            intensity={blurIntensity}
+            className="absolute inset-0"
+          />
+        </View>
+        <View className="relative z-10">{children}</View>
+      </View>
+    );
+  }
 
   return (
-    <View
+    <View 
+      className={containerClasses} 
       style={[
-        styles.base,
-        { borderRadius },
-        elevated ? theme.shadow.sm : null,
-        {
-          backgroundColor: isGlass ? glassBg : theme.colors.surface,
-          borderColor: isGlass ? glassBorder : theme.colors.border,
-          padding
-        },
         isGlass && Platform.OS === "web"
           ? ({
               backdropFilter: "blur(12px) saturate(120%)",
               WebkitBackdropFilter: "blur(12px) saturate(120%)"
             } as object)
           : null,
-        style,
+        style
       ]}
     >
-      {isGlass && Platform.OS !== "web" ? (
-        <View
-          pointerEvents="none"
-          style={[
-            StyleSheet.absoluteFillObject,
-            { borderRadius, overflow: "hidden" }
-          ]}
-        >
-          <BlurView
-            tint={theme.isDark ? "dark" : "light"}
-            intensity={blurIntensity}
-            style={StyleSheet.absoluteFillObject}
-          />
-          <View
-            style={[
-              StyleSheet.absoluteFillObject,
-              { backgroundColor: glassOverlay }
-            ]}
-          />
-        </View>
-      ) : null}
       {children}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  base: {
-    borderWidth: 1
-  }
-});

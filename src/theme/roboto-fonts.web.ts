@@ -1,2 +1,3 @@
-export const robotoFonts = {};
-
+export const robotoFonts = {
+  "Days": require("../../assets/fonts/Days.ttf"),
+};

@@ -2,6 +2,7 @@ export type ColorTokens = {
   bg: string;
   surface: string;
   surface2: string;
+  tabBarBg: string;
   text: string;
   textMuted: string;
   primary: string;
@@ -14,33 +15,35 @@ export type ColorTokens = {
 };
 
 export const lightColors: ColorTokens = {
-  bg: "#F7F7F8",
+  bg: "#F9F8F6",
   surface: "#FFFFFF",
-  surface2: "#F2F3F5",
-  text: "#3A3A3A",
-  textMuted: "#6B7280",
-  primary: "#EA580C",
-  primarySoft: "rgba(234, 88, 12, 0.12)",
+  surface2: "#F2F1EC",
+  tabBarBg: "#E8E7E3",
+  text: "#2B2B2B",
+  textMuted: "#7C7A72",
+  primary: "#D9521E",
+  primarySoft: "rgba(217, 82, 30, 0.08)",
   success: "#15803D",
   warning: "#B45309",
   danger: "#B91C1C",
-  border: "#E5E7EB",
-  focus: "#FB923C",
+  border: "#E4E3DF",
+  focus: "#F59E0B",
 };
 
 export const darkColors: ColorTokens = {
-  bg: "#0F0F10",
-  surface: "#161617",
-  surface2: "#1E1E20",
-  text: "#F1F1F2",
-  textMuted: "#B6B6B8",
-  primary: "#F97316",
-  primarySoft: "rgba(249, 115, 22, 0.18)",
+  bg: "#121110",
+  surface: "#1A1918",
+  surface2: "#242220",
+  tabBarBg: "#292725",
+  text: "#F7F6F5",
+  textMuted: "#A19E9A",
+  primary: "#E05E26",
+  primarySoft: "rgba(224, 94, 38, 0.16)",
   success: "#34D399",
   warning: "#FBBF24",
   danger: "#F87171",
-  border: "#2D2D30",
-  focus: "#FDBA74",
+  border: "#2E2C2A",
+  focus: "#FBBF24",
 };
 
 export const spacing = {
@@ -60,9 +63,11 @@ export const radius = {
 export const layout = {
   maxWidth: 1100,
   desktopNavMinWidth: 1024,
-  desktopNavHeight: 56,
+  desktopNavHeight: 64,
   desktopNavGapTop: spacing.sm,
-  desktopNavGapBottom: spacing.sm
+  desktopNavGapBottom: spacing.sm,
+  mobileTabBarHeight: 56,
+  mobileTopBarHeight: 56
 };
 
 // Backward-compatible alias for legacy imports.

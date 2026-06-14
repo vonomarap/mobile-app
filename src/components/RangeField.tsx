@@ -1,8 +1,6 @@
-import Slider from "@react-native-community/slider";
 import { Ionicons } from "@expo/vector-icons";
-import { ReactNode, useMemo, useState } from "react";
-import { Pressable, StyleProp, StyleSheet, Text, TextInput, View, ViewStyle } from "react-native";
-import { radius, spacing } from "../theme/tokens";
+import { ReactNode, useState } from "react";
+import { Pressable, StyleProp, Text, TextInput, View, ViewStyle } from "react-native";
 import { useTheme } from "../theme/ThemeProvider";
 
 function toFiniteNumber(value: unknown, fallback: number): number {
@@ -41,10 +39,7 @@ export function RangeField({
   containerStyle,
 }: Props): JSX.Element {
   const theme = useTheme();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
   const [focused, setFocused] = useState(false);
-  const [decHovered, setDecHovered] = useState(false);
-  const [incHovered, setIncHovered] = useState(false);
 
   const raw = value ?? "";
   const numeric = toFiniteNumber(raw, NaN);
@@ -77,33 +72,45 @@ export function RangeField({
     commitValue(next);
   };
 
-  return (
-    <View style={[styles.container, containerStyle]}>
-      <View style={styles.labelRow}>
-        <Text style={styles.label}>{label}</Text>
-        {labelRightSlot ? <View style={styles.labelRight}>{labelRightSlot}</View> : null}
-      </View>
+  const cardClasses = [
+    "border border-border dark:border-zinc-800 rounded-xl p-1.5 bg-card dark:bg-zinc-950",
+    disabled ? "opacity-50" : "opacity-100"
+  ].filter(Boolean).join(" ");
 
-      <View style={[styles.shell, focused ? styles.shellFocused : null, disabled ? styles.shellDisabled : null]}>
-        <View style={styles.inputRow}>
+  const decBtnClasses = [
+    "w-9 h-9 border border-border dark:border-zinc-800 bg-secondary dark:bg-zinc-900 rounded-lg items-center justify-center",
+    !canDec ? "opacity-35" : "active:opacity-70 active:bg-white dark:active:bg-zinc-800"
+  ].filter(Boolean).join(" ");
+
+  const incBtnClasses = [
+    "w-9 h-9 border border-border dark:border-zinc-800 bg-secondary dark:bg-zinc-900 rounded-lg items-center justify-center",
+    !canInc ? "opacity-35" : "active:opacity-70 active:bg-white dark:active:bg-zinc-800"
+  ].filter(Boolean).join(" ");
+
+  const textColor = theme.isDark ? "#fafafa" : "#18181b";
+  const iconColor = theme.isDark ? "#a1a1aa" : "#71717a";
+
+  return (
+    <View className="gap-1 mb-1" style={containerStyle}>
+      {label ? (
+        <View className="flex-row items-center justify-between px-0.5 mb-0.5">
+          <Text className="text-sm font-semibold text-foreground dark:text-zinc-100">{label}</Text>
+          {labelRightSlot ? <View>{labelRightSlot}</View> : null}
+        </View>
+      ) : null}
+
+      <View className={cardClasses}>
+        <View className="flex-row items-center justify-between w-full">
           <Pressable
             accessibilityRole="button"
             disabled={!canDec}
             onPress={() => stepBy(-1)}
-            onHoverIn={() => setDecHovered(true)}
-            onHoverOut={() => setDecHovered(false)}
-            style={({ pressed }) => [
-              styles.stepBtn,
-              styles.stepBtnLeft,
-              decHovered && canDec ? styles.stepBtnHovered : null,
-              !canDec ? styles.stepBtnDisabled : null,
-              pressed && canDec ? styles.stepBtnPressed : null,
-            ]}
+            className={decBtnClasses}
           >
-            <Ionicons name="remove" size={18} color={!canDec ? theme.colors.textMuted : theme.colors.text} />
+            <Ionicons name="remove" size={20} color={!canDec ? iconColor : textColor} />
           </Pressable>
 
-          <View style={styles.valueWrap}>
+          <View className="flex-row items-center justify-center gap-1 flex-1">
             <TextInput
               value={focused ? raw : getDisplayValue()}
               onChangeText={(txt) => onChangeText(txt.replace(/[^\d]/g, ""))}
@@ -115,162 +122,24 @@ export function RangeField({
               keyboardType="number-pad"
               inputMode="numeric"
               placeholder="--"
-              placeholderTextColor={theme.colors.textMuted}
-              style={styles.valueInput}
+              placeholderTextColor={iconColor}
+              className="text-lg font-bold text-center text-foreground dark:text-zinc-50 py-1 min-w-[40px]"
+              style={{ outlineStyle: "none", outlineWidth: 0 } as object}
               editable={!disabled}
             />
-            {unit ? <Text style={styles.unit}>{unit}</Text> : null}
+            {unit ? <Text className="text-xs font-semibold text-muted-foreground dark:text-zinc-400 mt-0.5">{unit}</Text> : null}
           </View>
 
           <Pressable
             accessibilityRole="button"
             disabled={!canInc}
             onPress={() => stepBy(1)}
-            onHoverIn={() => setIncHovered(true)}
-            onHoverOut={() => setIncHovered(false)}
-            style={({ pressed }) => [
-              styles.stepBtn,
-              styles.stepBtnRight,
-              incHovered && canInc ? styles.stepBtnHovered : null,
-              !canInc ? styles.stepBtnDisabled : null,
-              pressed && canInc ? styles.stepBtnPressed : null,
-            ]}
+            className={incBtnClasses}
           >
-            <Ionicons name="add" size={18} color={!canInc ? theme.colors.textMuted : theme.colors.text} />
+            <Ionicons name="add" size={20} color={!canInc ? iconColor : textColor} />
           </Pressable>
-        </View>
-
-        <View style={[styles.sliderWrap, { borderTopColor: theme.colors.border }]}>
-          <Slider
-            value={clampedValue}
-            onValueChange={(next) => commitValue(next)}
-            minimumValue={min}
-            maximumValue={max}
-            step={step}
-            minimumTrackTintColor={theme.colors.primary}
-            maximumTrackTintColor={theme.colors.border}
-            thumbTintColor={theme.colors.primary}
-            disabled={disabled}
-            style={styles.slider}
-          />
-          <View style={styles.boundsRow}>
-            <Text style={styles.boundsText}>
-              {min}
-              {unit ? ` ${unit}` : ""}
-            </Text>
-            <Text style={styles.boundsText}>
-              {max}
-              {unit ? ` ${unit}` : ""}
-            </Text>
-          </View>
         </View>
       </View>
     </View>
   );
-}
-
-function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof StyleSheet.create> {
-  return StyleSheet.create({
-    container: {
-      gap: spacing.xs,
-    },
-    labelRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: spacing.xs,
-      flexWrap: "wrap",
-    },
-    label: {
-      ...theme.typography.label,
-      color: theme.colors.text,
-      flexShrink: 1,
-    },
-    labelRight: {
-      marginTop: 1,
-    },
-    shell: {
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      borderRadius: radius.sm,
-      backgroundColor: theme.colors.surface,
-      overflow: "hidden",
-    },
-    shellFocused: {
-      borderColor: theme.colors.focus,
-    },
-    shellDisabled: {
-      opacity: 0.6,
-    },
-    inputRow: {
-      minHeight: 48,
-      flexDirection: "row",
-      alignItems: "stretch",
-    },
-    stepBtn: {
-      width: 46,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: theme.colors.surface,
-      ...( { outlineStyle: "none", outlineWidth: 0, WebkitTapHighlightColor: "transparent" } as object ),
-      ...( { cursor: "pointer" } as object ),
-    },
-    stepBtnLeft: {
-      borderRightWidth: 1,
-      borderRightColor: theme.colors.border,
-    },
-    stepBtnRight: {
-      borderLeftWidth: 1,
-      borderLeftColor: theme.colors.border,
-    },
-    stepBtnHovered: {
-      backgroundColor: theme.colors.surface2,
-    },
-    stepBtnPressed: {
-      backgroundColor: theme.colors.surface2,
-      opacity: 0.88,
-    },
-    stepBtnDisabled: {
-      opacity: 0.42,
-    },
-    valueWrap: {
-      flex: 1,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: spacing.xs,
-      paddingHorizontal: spacing.sm,
-    },
-    valueInput: {
-      ...theme.typography.bodyRegular,
-      color: theme.colors.text,
-      textAlign: "center",
-      paddingVertical: 10,
-      minWidth: 56,
-      ...( { outlineStyle: "none", outlineWidth: 0 } as object ),
-    },
-    unit: {
-      ...theme.typography.caption,
-      color: theme.colors.textMuted,
-    },
-    sliderWrap: {
-      paddingHorizontal: spacing.sm,
-      paddingTop: spacing.sm,
-      paddingBottom: spacing.xs,
-      gap: 4,
-      borderTopWidth: 1,
-    },
-    slider: {
-      width: "100%",
-      height: 24,
-    },
-    boundsRow: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      gap: spacing.sm,
-    },
-    boundsText: {
-      ...theme.typography.caption,
-      color: theme.colors.textMuted,
-    },
-  });
 }

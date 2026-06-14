@@ -13,6 +13,7 @@ export function AppFlatList<ItemT>({
   onScroll,
   scrollEventThrottle,
   contentContainerStyle,
+  style,
   ...rest
 }: Props<ItemT>): JSX.Element {
   const theme = useTheme();
@@ -27,8 +28,7 @@ export function AppFlatList<ItemT>({
   const flattened = StyleSheet.flatten(contentContainerStyle) as { paddingTop?: number } | undefined;
   const existingPaddingTop = typeof flattened?.paddingTop === "number" ? flattened.paddingTop : 0;
 
-  const baseContentContainerStyle =
-    Platform.OS === "web" ? ([{ flexGrow: 1 }, contentContainerStyle] as any) : contentContainerStyle;
+  const baseContentContainerStyle = [{ flexGrow: 1 }, contentContainerStyle] as any;
 
   const nextContentContainerStyle = desktopNavOffset
     ? [baseContentContainerStyle, { paddingTop: existingPaddingTop + desktopNavOffset }]
@@ -47,12 +47,19 @@ export function AppFlatList<ItemT>({
     onScroll?.(event);
   }, [onScroll, setScrollY, trackNavGlass]);
 
+  const mergedStyle = style ? [{ flex: 1 }, style as any] : styles.flex;
+
   return (
     <FlatList
       {...rest}
+      style={mergedStyle}
       contentContainerStyle={nextContentContainerStyle}
       onScroll={trackNavGlass ? handleScroll : onScroll}
       scrollEventThrottle={trackNavGlass && Platform.OS === "web" ? (scrollEventThrottle ?? 16) : scrollEventThrottle}
     />
   );
 }
+
+const styles = StyleSheet.create({
+  flex: { flex: 1 },
+});

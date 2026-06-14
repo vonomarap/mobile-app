@@ -28,20 +28,32 @@ export function QuoteCard({ quote, onPress }: { quote: Quote; onPress?: () => vo
       ? "warning"
       : "primary";
 
-  const pill = getPillColors(theme.isDark, tone, theme.colors);
+  const pill = getPillColors(theme.isDark, tone);
   const isPreliminaryQuote = statusCode === "NEW" || statusCode === "IN_REVIEW";
 
   const content = (
-    <Card style={styles.card}>
-      <Text style={[styles.status, { color: pill.text, backgroundColor: pill.bg }]}>{statusLabel}</Text>
+    <Card variant="solid" style={styles.card}>
+      <Text
+        style={[
+          styles.status,
+          {
+            color: pill.text,
+            backgroundColor: pill.bg,
+            borderColor: pill.border,
+            borderWidth: 1
+          }
+        ]}
+      >
+        {statusLabel}
+      </Text>
       <Text style={[styles.title, { color: theme.colors.text }]}>#{quote.id}</Text>
       <View style={styles.metaRow}>
-        <Ionicons name="calendar-outline" size={16} color={theme.colors.textMuted} />
+        <Ionicons name="calendar-outline" size={14} color={theme.colors.textMuted} />
         <Text style={[styles.meta, { color: theme.colors.textMuted }]}>{createdAt}</Text>
       </View>
       <View style={styles.priceRow}>
-        <Ionicons name="cash-outline" size={16} color={theme.colors.primary} />
-        <Text style={[styles.price, { color: theme.colors.primary }]}>
+        <Ionicons name="cash-outline" size={14} color={theme.colors.text} />
+        <Text style={[styles.price, { color: theme.colors.text }]}>
           {formatMoney(quote.totalPrice ?? 0, quote.currency ?? currency)}
         </Text>
       </View>
@@ -83,11 +95,11 @@ const styles = StyleSheet.create({
   },
   status: {
     alignSelf: "flex-start",
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: 99,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
     ...font(700),
-    fontSize: 12
+    fontSize: 11
   },
   title: {
     ...font(700),
@@ -108,7 +120,7 @@ const styles = StyleSheet.create({
   },
   price: {
     ...font(700),
-    fontSize: 16,
+    fontSize: 15,
   },
   priceNote: {
     fontSize: 12,
@@ -117,17 +129,32 @@ const styles = StyleSheet.create({
 
 function getPillColors(
   isDark: boolean,
-  tone: "primary" | "success" | "warning" | "danger",
-  colors: { primary: string; success: string; warning: string; danger: string; primarySoft: string }
-): { bg: string; text: string } {
+  tone: "primary" | "success" | "warning" | "danger"
+): { bg: string; text: string; border: string } {
   if (tone === "success") {
-    return { bg: isDark ? "#063A2B" : "#E3F5ED", text: colors.success };
+    return {
+      bg: isDark ? "rgba(16, 185, 129, 0.12)" : "rgba(16, 185, 129, 0.08)",
+      text: isDark ? "#34d399" : "#059669",
+      border: isDark ? "rgba(16, 185, 129, 0.2)" : "rgba(16, 185, 129, 0.15)"
+    };
   }
   if (tone === "warning") {
-    return { bg: isDark ? "#3A2A06" : "#FFF3D6", text: colors.warning };
+    return {
+      bg: isDark ? "rgba(245, 158, 11, 0.12)" : "rgba(245, 158, 11, 0.08)",
+      text: isDark ? "#fbbf24" : "#d97706",
+      border: isDark ? "rgba(245, 158, 11, 0.2)" : "rgba(245, 158, 11, 0.15)"
+    };
   }
   if (tone === "danger") {
-    return { bg: isDark ? "#3A0D12" : "#FBE5E5", text: colors.danger };
+    return {
+      bg: isDark ? "rgba(239, 68, 68, 0.12)" : "rgba(239, 68, 68, 0.08)",
+      text: isDark ? "#f87171" : "#dc2626",
+      border: isDark ? "rgba(239, 68, 68, 0.2)" : "rgba(239, 68, 68, 0.15)"
+    };
   }
-  return { bg: colors.primarySoft, text: colors.primary };
+  return {
+    bg: isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.04)",
+    text: isDark ? "#e4e4e7" : "#3f3f46",
+    border: isDark ? "rgba(255, 255, 255, 0.12)" : "rgba(0, 0, 0, 0.06)"
+  };
 }

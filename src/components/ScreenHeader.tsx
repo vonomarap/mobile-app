@@ -1,16 +1,19 @@
 import { ReactNode, useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { font } from "../theme/font";
 import { spacing } from "../theme/tokens";
 import { useTheme } from "../theme/ThemeProvider";
 
 export function ScreenHeader({
   title,
   subtitle,
+  eyebrow,
   rightSlot,
   align = "left"
 }: {
   title: string;
   subtitle?: string;
+  eyebrow?: string;
   rightSlot?: ReactNode;
   align?: "left" | "center";
 }): JSX.Element {
@@ -21,6 +24,7 @@ export function ScreenHeader({
   return (
     <View style={[styles.row, isCentered ? styles.rowCentered : null]}>
       <View style={[styles.left, isCentered ? styles.leftCentered : null]}>
+        {eyebrow ? <Text style={[styles.eyebrow, isCentered ? styles.textCentered : null]}>{eyebrow.toUpperCase()}</Text> : null}
         <Text style={[styles.title, isCentered ? styles.textCentered : null]}>{title}</Text>
         {subtitle ? <Text style={[styles.subtitle, isCentered ? styles.textCentered : null]}>{subtitle}</Text> : null}
       </View>
@@ -54,6 +58,13 @@ function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof Style
     },
     textCentered: {
       textAlign: "center"
+    },
+    eyebrow: {
+      ...font(800),
+      fontSize: 12,
+      lineHeight: 16,
+      textTransform: "uppercase",
+      color: theme.colors.primary
     },
     title: {
       ...theme.typography.h2,

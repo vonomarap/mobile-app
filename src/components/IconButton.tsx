@@ -65,10 +65,10 @@ export function IconButton({
 
     if (tone === "soft" || selected) {
       return {
-        backgroundColor: selected ? theme.colors.primarySoft : theme.colors.surface,
-        borderColor: selected ? theme.colors.primary : theme.colors.border,
-        iconColor: theme.colors.primary,
-        hoveredBackgroundColor: selected ? theme.colors.primarySoft : theme.colors.surface2,
+        backgroundColor: selected ? (theme.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.05)") : theme.colors.surface,
+        borderColor: selected ? (theme.isDark ? "#fafafa" : "#18181b") : theme.colors.border,
+        iconColor: theme.colors.text,
+        hoveredBackgroundColor: selected ? (theme.isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.05)") : theme.colors.surface2,
       };
     }
 

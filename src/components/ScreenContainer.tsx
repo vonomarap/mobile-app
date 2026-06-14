@@ -1,10 +1,12 @@
 import { PropsWithChildren, useEffect, useRef, useState } from "react";
-import { AccessibilityInfo, Animated, Easing, Platform, StyleSheet, View } from "react-native";
+import { AccessibilityInfo, Animated, Easing, Platform, StyleSheet, View, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../theme/ThemeProvider";
 
 export function ScreenContainer({ children }: PropsWithChildren): JSX.Element {
   const theme = useTheme();
+  const { width } = useWindowDimensions();
+  const isMobile = Platform.OS !== "web" || width < theme.layout.desktopNavMinWidth;
   const [reduceMotion, setReduceMotion] = useState(false);
   const enter = useRef(new Animated.Value(Platform.OS === "web" ? 0 : 1)).current;
 
@@ -61,10 +63,13 @@ export function ScreenContainer({ children }: PropsWithChildren): JSX.Element {
         }
       : null;
 
+  const mobileBottomPadding = isMobile ? theme.layout.mobileTabBarHeight : 0;
+  const mobileTopPadding = isMobile ? theme.layout.mobileTopBarHeight : 0;
+
   return (
     <SafeAreaView edges={edges} style={[styles.safeArea, { backgroundColor: theme.colors.bg }]}>
       <View style={[styles.container, { backgroundColor: theme.colors.bg }]}>
-        <View style={[styles.inner, { maxWidth: theme.layout.maxWidth }]}>
+        <View style={[styles.inner, { maxWidth: theme.layout.maxWidth }, isMobile ? { paddingTop: mobileTopPadding, paddingBottom: mobileBottomPadding } : null]}>
           {Platform.OS === "web" ? (
             <Animated.View style={[styles.enterWrap, enterStyle as any]}>{children}</Animated.View>
           ) : (

@@ -17,12 +17,14 @@ export function ProductCard({
   item,
   kind,
   onPress,
-  variant = "grid"
+  variant = "grid",
+  desktopGrid = false
 }: {
   item: Product;
   kind?: Kind;
   onPress?: () => void;
   variant?: CardVariant;
+  desktopGrid?: boolean;
 }): JSX.Element {
   const reduceMotion = useReduceMotion();
   const theme = useTheme();
@@ -45,7 +47,9 @@ export function ProductCard({
   const listTitleSize = width < 480 ? 16 : 18;
   const listTitleLine = width < 480 ? 20 : 22;
   const listDescLines = width < 480 ? 1 : 2;
-  const imageDimColor = theme.isDark ? "rgba(0,0,0,0.21)" : "rgba(0,0,0,0.14)";
+  const imageDimColor = desktopGrid
+    ? (theme.isDark ? "rgba(0,0,0,0.44)" : "rgba(0,0,0,0.32)")
+    : (theme.isDark ? "rgba(0,0,0,0.21)" : "rgba(0,0,0,0.14)");
 
   const glowWebStyle =
     Platform.OS === "web"
@@ -199,15 +203,6 @@ export function ProductCard({
     );
   }
 
-  const typeLabel =
-    kind === "door"
-      ? t("catalog.badges.door")
-      : kind === "window"
-      ? t("catalog.badges.window")
-      : t("catalog.badges.product");
-
-  const chipBg = "rgba(0,0,0,0.34)";
-  const chipBorder = "rgba(255,255,255,0.18)";
 
   const gridBlurRadius = 60;
   const gridBlurScale = 1.2;
@@ -229,15 +224,6 @@ export function ProductCard({
         } as any)
       : null;
 
-  const showCornerPrice = !isList;
-
-  const priceGlowWebStyle =
-    Platform.OS === "web"
-      ? ({
-          boxShadow:
-            "0 0 0 1px rgba(249,115,22,0.48), 0 10px 28px rgba(249,115,22,0.34), 0 0 64px rgba(249,115,22,0.22)"
-        } as any)
-      : null;
 
   const content = (
     <View style={[styles.clip, !isList ? styles.clipGrid : null, isList ? styles.clipList : null, { backgroundColor: theme.colors.surface2 }]}>
@@ -293,10 +279,10 @@ export function ProductCard({
             </Text>
           ) : null}
 
-          <View style={styles.chipRow}>
-            <View style={[styles.chip, { backgroundColor: chipBg, borderColor: chipBorder }]}>
-              <Text style={styles.chipText} numberOfLines={1}>
-                {typeLabel}
+          <View style={[styles.chipRow, { justifyContent: "flex-end" }]}>
+            <View style={styles.priceChip}>
+              <Text style={styles.priceChipText} numberOfLines={1}>
+                {priceText}
               </Text>
             </View>
           </View>
@@ -329,16 +315,6 @@ export function ProductCard({
         </View>
       </View>
 
-      {showCornerPrice ? (
-        <View pointerEvents="none" style={styles.priceCornerWrap}>
-          <View pointerEvents="none" style={[styles.priceCornerGlow, priceGlowWebStyle]} />
-          <View style={styles.priceCornerPill}>
-            <Text style={styles.priceCornerText} numberOfLines={1}>
-              {priceText}
-            </Text>
-          </View>
-        </View>
-      ) : null}
     </View>
   );
 
@@ -637,6 +613,26 @@ const styles = StyleSheet.create({
     fontSize: 11,
     letterSpacing: 0.2
   },
+  priceBadgeText: {
+    color: "rgba(249,115,22,1)",
+    ...font(900),
+    fontSize: 14,
+    letterSpacing: 0.2,
+  },
+  priceChip: {
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    backgroundColor: "rgba(234,88,12,0.82)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.25)",
+  },
+  priceChipText: {
+    color: "#FFFFFF",
+    ...font(900),
+    fontSize: 14,
+    letterSpacing: 0.2,
+  },
   cta: {
     marginTop: spacing.xs,
     height: 44,
@@ -659,34 +655,5 @@ const styles = StyleSheet.create({
     ...font(900),
     fontSize: 13,
     letterSpacing: 0.2
-  },
-  priceCornerWrap: {
-    position: "absolute",
-    top: spacing.md,
-    right: spacing.md,
-    zIndex: 10,
-    maxWidth: "78%",
-  },
-  priceCornerGlow: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 999,
-    backgroundColor: "rgba(249,115,22,0.22)"
-  },
-  priceCornerPill: {
-    position: "relative",
-    overflow: "hidden",
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    height: 30,
-    justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.34)",
-    borderWidth: 1,
-    borderColor: "rgba(249,115,22,0.55)",
-  },
-  priceCornerText: {
-    color: "#FFFFFF",
-    ...font(900),
-    fontSize: 12,
-    letterSpacing: 0.2
-  },
+  }
 });

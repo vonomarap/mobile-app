@@ -1,10 +1,8 @@
-import { ReactNode, useMemo, useState } from "react";
-import { StyleProp, StyleSheet, Text, TextInput, TextInputProps, TextStyle, View, ViewStyle } from "react-native";
-import { radius, spacing } from "../theme/tokens";
-import { useTheme } from "../theme/ThemeProvider";
+import { ReactNode, useState } from "react";
+import { StyleProp, Text, TextInput, TextInputProps, TextStyle, View, ViewStyle } from "react-native";
 
 type Props = Omit<TextInputProps, "style"> & {
-  label: string;
+  label?: string;
   labelRightSlot?: ReactNode;
   leftSlot?: ReactNode;
   helperText?: string;
@@ -23,24 +21,31 @@ export function TextField({
   inputStyle,
   ...inputProps
 }: Props): JSX.Element {
-  const theme = useTheme();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
   const [focused, setFocused] = useState(false);
 
+  const rowClasses = [
+    "min-h-[48px] border rounded-xl px-4 flex-row items-center gap-3 bg-white dark:bg-zinc-950",
+    focused
+      ? "border-zinc-900 dark:border-zinc-200"
+      : "border-border dark:border-zinc-800",
+    inputProps.editable === false ? "opacity-60" : "opacity-100"
+  ].filter(Boolean).join(" ");
+
+  const labelClasses = [
+    "text-sm font-semibold flex-shrink-1",
+    errorText ? "text-red-650 dark:text-red-400" : "text-foreground dark:text-zinc-100"
+  ].join(" ");
+
   return (
-    <View style={[styles.container, containerStyle]}>
-      <View style={styles.labelRow}>
-        <Text style={styles.label}>{label}</Text>
-        {labelRightSlot ? <View style={styles.labelRight}>{labelRightSlot}</View> : null}
-      </View>
-      <View
-        style={[
-          styles.inputRow,
-          focused ? styles.inputRowFocused : null,
-          inputProps.editable === false ? styles.inputRowDisabled : null
-        ]}
-      >
-        {leftSlot ? <View style={styles.leftSlot}>{leftSlot}</View> : null}
+    <View className="gap-1.5" style={containerStyle}>
+      {label ? (
+        <View className="flex-row items-center gap-1.5 flex-wrap">
+          <Text className={labelClasses}>{label}</Text>
+          {labelRightSlot ? <View className="mt-0.5">{labelRightSlot}</View> : null}
+        </View>
+      ) : null}
+      <View className={rowClasses}>
+        {leftSlot ? <View className="min-w-[20px] items-center justify-center">{leftSlot}</View> : null}
         <TextInput
           {...inputProps}
           onFocus={(e) => {
@@ -51,71 +56,16 @@ export function TextField({
             setFocused(false);
             inputProps.onBlur?.(e);
           }}
-          placeholderTextColor={theme.colors.textMuted}
-          style={[styles.input, inputStyle]}
+          placeholderTextColor={focused ? "rgba(0,0,0,0.3)" : "rgba(0,0,0,0.4)"}
+          className="flex-1 py-2.5 text-sm font-medium text-foreground dark:text-zinc-50"
+          style={[
+            { outlineStyle: "none", outlineWidth: 0 } as object,
+            inputStyle
+          ]}
         />
       </View>
-      {errorText ? <Text style={styles.error}>{errorText}</Text> : null}
-      {helperText && !errorText ? <Text style={styles.helper}>{helperText}</Text> : null}
+      {errorText ? <Text className="text-xs text-red-650 dark:text-red-400 pl-0.5">{errorText}</Text> : null}
+      {helperText && !errorText ? <Text className="text-xs text-muted-foreground dark:text-zinc-400 pl-0.5">{helperText}</Text> : null}
     </View>
   );
-}
-
-function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof StyleSheet.create> {
-  return StyleSheet.create({
-    container: {
-      gap: spacing.xs
-    },
-    labelRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: spacing.xs,
-      flexWrap: "wrap"
-    },
-    label: {
-      ...theme.typography.label,
-      color: theme.colors.text,
-      flexShrink: 1
-    },
-    labelRight: {
-      marginTop: 1
-    },
-    inputRow: {
-      minHeight: 48,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      borderRadius: radius.sm,
-      backgroundColor: theme.colors.surface,
-      paddingHorizontal: spacing.sm,
-      paddingVertical: 2,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: spacing.sm
-    },
-    inputRowFocused: {
-      borderColor: theme.colors.focus
-    },
-    inputRowDisabled: {
-      opacity: 0.6
-    },
-    leftSlot: {
-      minWidth: 20,
-      alignItems: "center",
-      justifyContent: "center"
-    },
-    input: {
-      flex: 1,
-      paddingVertical: 10,
-      color: theme.colors.text,
-      ...( { outlineStyle: "none", outlineWidth: 0 } as object )
-    },
-    helper: {
-      ...theme.typography.caption,
-      color: theme.colors.textMuted
-    },
-    error: {
-      ...theme.typography.caption,
-      color: theme.colors.danger
-    }
-  });
 }

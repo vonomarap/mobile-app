@@ -1,7 +1,5 @@
-import { ReactNode, useMemo } from "react";
-import { Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
-import { spacing } from "../theme/tokens";
-import { useTheme } from "../theme/ThemeProvider";
+import { ReactNode } from "react";
+import { Pressable, StyleProp, Text, View, ViewStyle } from "react-native";
 
 type Props = {
   label: string;
@@ -34,16 +32,33 @@ export function PickerField({
   active = false,
   variant = "default"
 }: Props): JSX.Element {
-  const theme = useTheme();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
   const hasValue = Boolean((value ?? "").trim());
   const isSelect = variant === "select";
 
+  const rowClasses = [
+    "border rounded-xl px-3 flex-row items-center gap-2",
+    isSelect ? "min-h-[50px] px-4 gap-2.5" : "min-h-[44px]",
+    disabled ? "opacity-50" : "opacity-100",
+    active 
+      ? "border-zinc-900 dark:border-zinc-200 bg-white dark:bg-zinc-900 shadow-sm"
+      : "border-border dark:border-zinc-800 bg-white/70 dark:bg-zinc-900/40 active:bg-zinc-100 dark:active:bg-zinc-800",
+  ].filter(Boolean).join(" ");
+
+  const valueClasses = [
+    "flex-1",
+    isSelect ? "py-3 text-base font-semibold" : "py-2.5 text-sm font-medium",
+    hasValue 
+      ? "text-foreground dark:text-zinc-50" 
+      : "text-muted-foreground dark:text-zinc-400"
+  ].filter(Boolean).join(" ");
+
   return (
-    <View style={[styles.container, containerStyle]}>
-      <View style={styles.labelRow}>
-        <Text style={styles.label}>{label}</Text>
-        {labelRightSlot ? <View style={styles.labelRight}>{labelRightSlot}</View> : null}
+    <View className="gap-1" style={containerStyle}>
+      <View className="flex-row items-center gap-1.5 flex-wrap">
+        <Text className="text-sm font-semibold text-foreground dark:text-zinc-100 flex-shrink-1">
+          {label}
+        </Text>
+        {labelRightSlot ? <View>{labelRightSlot}</View> : null}
       </View>
 
       <Pressable
@@ -51,144 +66,17 @@ export function PickerField({
         accessibilityState={{ disabled }}
         disabled={disabled}
         onPress={onPress}
-        style={(state) => {
-          const hovered = (state as unknown as { hovered?: boolean }).hovered;
-          return [
-            styles.inputRow,
-            isSelect ? styles.inputRowSelect : null,
-            disabled ? styles.inputRowDisabled : null,
-            active ? styles.inputRowActive : null,
-            active && isSelect ? styles.inputRowSelectActive : null,
-            hovered && !active ? styles.inputRowHovered : null,
-            hovered && !active && isSelect ? styles.inputRowSelectHovered : null,
-            state.pressed ? styles.inputRowPressed : null
-          ];
-        }}
+        className={rowClasses}
       >
-        {leftSlot ? <View style={[styles.leftSlot, isSelect ? styles.leftSlotSelect : null]}>{leftSlot}</View> : null}
-        <Text
-          numberOfLines={1}
-          style={[
-            styles.value,
-            isSelect ? styles.valueSelect : null,
-            !hasValue ? styles.placeholder : null,
-            !hasValue && isSelect ? styles.placeholderSelect : null
-          ]}
-        >
+        {leftSlot ? <View className={isSelect ? "min-w-[18px] items-center justify-center" : "min-w-[16px] items-center justify-center"}>{leftSlot}</View> : null}
+        <Text numberOfLines={1} className={valueClasses}>
           {hasValue ? value : (placeholder ?? "")}
         </Text>
-        {rightSlot ? <View style={[styles.rightSlot, isSelect ? styles.rightSlotSelect : null]}>{rightSlot}</View> : null}
+        {rightSlot ? <View className={isSelect ? "min-w-[18px] items-center justify-center" : "min-w-[16px] items-center justify-center"}>{rightSlot}</View> : null}
       </Pressable>
 
-      {errorText ? <Text style={[styles.error, isSelect ? styles.feedbackSelect : null]}>{errorText}</Text> : null}
-      {helperText && !errorText ? <Text style={[styles.helper, isSelect ? styles.feedbackSelect : null]}>{helperText}</Text> : null}
+      {errorText ? <Text className="text-xs text-red-600 dark:text-red-400 pl-0.5">{errorText}</Text> : null}
+      {helperText && !errorText ? <Text className="text-xs text-muted-foreground dark:text-zinc-400 pl-0.5">{helperText}</Text> : null}
     </View>
   );
-}
-
-function makeStyles(theme: ReturnType<typeof useTheme>): ReturnType<typeof StyleSheet.create> {
-  return StyleSheet.create({
-    container: {
-      gap: spacing.xs
-    },
-    labelRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: spacing.xs,
-      flexWrap: "wrap"
-    },
-    label: {
-      ...theme.typography.label,
-      color: theme.colors.text,
-      flexShrink: 1
-    },
-    labelRight: {
-      marginTop: 1
-    },
-    inputRow: {
-      minHeight: 44,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      borderRadius: 8,
-      backgroundColor: theme.colors.surface,
-      paddingHorizontal: 12,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-      ...( { outlineStyle: "none", outlineWidth: 0, WebkitTapHighlightColor: "transparent" } as object ),
-      ...( { cursor: "pointer" } as object )
-    },
-    inputRowSelect: {
-      minHeight: 50,
-      paddingHorizontal: 14,
-      gap: 10
-    },
-    inputRowDisabled: {
-      opacity: 0.6
-    },
-    inputRowActive: {
-      borderColor: theme.colors.focus,
-      backgroundColor: theme.colors.surface
-    },
-    inputRowSelectActive: {
-      borderColor: theme.colors.primary,
-      backgroundColor: theme.colors.surface
-    },
-    inputRowHovered: {
-      borderColor: theme.colors.focus
-    },
-    inputRowSelectHovered: {
-      borderColor: theme.colors.textMuted
-    },
-    inputRowPressed: {
-      opacity: 0.96,
-      backgroundColor: theme.colors.surface2
-    },
-    leftSlot: {
-      minWidth: 16,
-      alignItems: "center",
-      justifyContent: "center"
-    },
-    leftSlotSelect: {
-      minWidth: 18
-    },
-    rightSlot: {
-      minWidth: 16,
-      alignItems: "center",
-      justifyContent: "center"
-    },
-    rightSlotSelect: {
-      minWidth: 18
-    },
-    value: {
-      flex: 1,
-      paddingVertical: 10,
-      color: theme.colors.text,
-      ...theme.typography.bodyRegular,
-      fontWeight: "500"
-    },
-    valueSelect: {
-      paddingVertical: 12,
-      fontSize: 15,
-      lineHeight: 20,
-      fontWeight: "600"
-    },
-    placeholder: {
-      color: theme.colors.textMuted
-    },
-    placeholderSelect: {
-      fontWeight: "500"
-    },
-    helper: {
-      ...theme.typography.caption,
-      color: theme.colors.textMuted
-    },
-    feedbackSelect: {
-      paddingLeft: 2
-    },
-    error: {
-      ...theme.typography.caption,
-      color: theme.colors.danger
-    }
-  });
 }
