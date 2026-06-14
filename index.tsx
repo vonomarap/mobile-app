@@ -1,3 +1,4 @@
+import "./global.css";
 import { registerRootComponent } from "expo";
 import { ComponentType } from "react";
 import { StyleSheet, Text, View } from "react-native";

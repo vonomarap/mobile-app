@@ -70,6 +70,14 @@
           "destination": "/contacts.html"
         },
         {
+          "source": "/moskitki",
+          "destination": "/moskitki.html"
+        },
+        {
+          "source": "/moskitki/**",
+          "destination": "/moskitki.html"
+        },
+        {
           "source": "**",
           "destination": "/index.html"
         }

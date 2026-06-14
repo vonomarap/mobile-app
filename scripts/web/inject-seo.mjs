@@ -14,6 +14,97 @@ function escapeHtmlAttribute(value) {
     .replace(/>/g, "&gt;");
 }
 
+function escapeJsonString(value) {
+  return String(value)
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "\\r")
+    .replace(/\t/g, "\\t");
+}
+
+function makeJsonLdTag(obj) {
+  const json = JSON.stringify(obj, null, 2);
+  return `<script type="application/ld+json">\n${json}\n</script>`;
+}
+
+function makeHreflangLinks(canonical) {
+  return (
+    `    <link rel="alternate" hreflang="ru" href="${escapeHtmlAttribute(canonical)}" />\n` +
+    `    <link rel="alternate" hreflang="x-default" href="${escapeHtmlAttribute(canonical)}" />\n`
+  );
+}
+
+function buildLocalBusinessJsonLd() {
+  return {
+    "@context": "https://schema.org",
+    "@type": "HomeGoodsStore",
+    "name": BRAND_NAME,
+    "description": CATALOG_DESCRIPTION,
+    "url": BASE_URL,
+    "logo": `${BASE_URL}/og-catalog-v3.png`,
+    "image": `${BASE_URL}/og-catalog-v3.png`,
+    "address": {
+      "@type": "PostalAddress",
+      "addressLocality": "Каневская",
+      "addressRegion": "Краснодарский край",
+      "addressCountry": "RU"
+    },
+    "areaServed": {
+      "@type": "AdministrativeArea",
+      "name": "Каневской район"
+    },
+    "priceRange": "RUB",
+    "currenciesAccepted": "RUB"
+  };
+}
+
+function buildWebSiteJsonLd() {
+  return {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": BRAND_NAME,
+    "url": BASE_URL,
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": `${BASE_URL}/catalog?q={search_term_string}`,
+      "query-input": "required name=search_term_string"
+    }
+  };
+}
+
+function buildBreadcrumbJsonLd(items) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": items.map((item, i) => ({
+      "@type": "ListItem",
+      "position": i + 1,
+      "name": item.name,
+      "item": item.url
+    }))
+  };
+}
+
+function removeJsonLdScripts(html) {
+  return html.replace(/<script\s+type=["']application\/ld\+json["']>[\s\S]*?<\/script>\s*/gi, "");
+}
+
+function injectJsonLd(html, jsonLdObjects) {
+  const scripts = jsonLdObjects.map(makeJsonLdTag).join("\n");
+  const headEndMatch = html.match(/<\/head>\s*/i);
+  if (headEndMatch && headEndMatch.index != null) {
+    const at = headEndMatch.index;
+    return html.slice(0, at) + "\n" + scripts + "\n" + html.slice(at);
+  }
+  return scripts + "\n" + html;
+}
+
+function injectHreflang(html, canonical) {
+  const links = makeHreflangLinks(canonical);
+  return insertAfterTitle(html, links);
+}
+
 function setHtmlLang(html, lang) {
   return html.replace(/<html\b([^>]*)>/i, (match, attrs) => {
     if (/\blang\s*=/.test(attrs)) {
@@ -66,8 +157,8 @@ function insertAfterTitle(html, snippet) {
   return snippet + html;
 }
 
-const BASE_URL = "https://kanokna.web.app";
-const BRAND_NAME = "КанОкна";
+const BASE_URL = "https://kanokna.org";
+const BRAND_NAME = "Канокна";
 const CATALOG_TITLE = `Каталог окон и дверей | ${BRAND_NAME}`;
 const CATALOG_DESCRIPTION = "Каталог окон, дверей и комплектующих. Выберите товар и рассчитайте стоимость в калькуляторе.";
 const DEFAULT_DESCRIPTION =
@@ -97,8 +188,17 @@ function readOptionalTextFile(filepath) {
 // Google Search Console verification.
 // Provide via env var or create seo/google-site-verification.txt with the token.
 const googleSiteVerification =
-  (process.env.GOOGLE_SITE_VERIFICATION ?? process.env.SEO_GOOGLE_SITE_VERIFICATION ?? "").trim() ||
-  readOptionalTextFile(path.join(repoRoot, "seo", "google-site-verification.txt"));
+  ((process.env.GOOGLE_SITE_VERIFICATION ?? process.env.SEO_GOOGLE_SITE_VERIFICATION ?? "").trim() ||
+    readOptionalTextFile(path.join(repoRoot, "seo", "google-site-verification.txt")) || "");
+const googleSiteVerificationActive =
+  googleSiteVerification &&
+  !googleSiteVerification.startsWith("ЗАМЕНИТЕ");
+
+// Yandex.Webmaster verification.
+// Provide via env var or create seo/yandex-verification.txt with the token.
+const YANDEX_VERIFICATION =
+  (process.env.YANDEX_VERIFICATION ?? "").trim() ||
+  readOptionalTextFile(path.join(repoRoot, "seo", "yandex-verification.txt")) || "";
 
 if (!fs.existsSync(indexPath)) {
   console.error(`SEO inject: index.html not found at: ${indexPath}`);
@@ -127,7 +227,9 @@ function injectSeo({
   description,
   canonical,
   ogImageUrl,
-  robots
+  robots,
+  jsonLd,
+  breadcrumb
 }) {
   let out = html;
 
@@ -140,11 +242,14 @@ function injectSeo({
   out = removeMetaByName(out, "robots");
   out = removeMetaByName(out, "theme-color");
   out = removeMetaByName(out, "google-site-verification");
+  out = removeMetaByName(out, "yandex-verification");
   out = removeLinkCanonical(out);
   out = removeLinkByRel(out, "shortcut icon");
   out = removeLinkByRel(out, "icon");
   out = removeLinkByRel(out, "apple-touch-icon");
   out = removeLinkByRel(out, "manifest");
+  out = removeLinkByRel(out, "alternate");
+  out = removeJsonLdScripts(out);
 
   for (const prop of MANAGED_OG_PROPS) {
     out = removeMetaByProperty(out, prop);
@@ -158,8 +263,11 @@ function injectSeo({
     `    <meta name="description" content="${escapeHtmlAttribute(description)}" />\n` +
     `    <meta name="robots" content="${escapeHtmlAttribute(robots)}" />\n` +
     `    <meta name="theme-color" content="${escapeHtmlAttribute(THEME_COLOR)}" />\n` +
-    (googleSiteVerification
+    (googleSiteVerificationActive
       ? `    <meta name="google-site-verification" content="${escapeHtmlAttribute(googleSiteVerification)}" />\n`
+      : "") +
+    (YANDEX_VERIFICATION
+      ? `    <meta name="yandex-verification" content="${escapeHtmlAttribute(YANDEX_VERIFICATION)}" />\n`
       : "") +
     `    <link rel="manifest" href="/site.webmanifest" />\n` +
     `    <link rel="icon" href="/favicon.ico" sizes="any" />\n` +
@@ -167,6 +275,7 @@ function injectSeo({
     `    <link rel="shortcut icon" href="/favicon.png" />\n` +
     `    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />\n` +
     `    <link rel="canonical" href="${escapeHtmlAttribute(canonical)}" />\n` +
+    makeHreflangLinks(canonical) +
     `\n` +
     `    <meta property="og:title" content="${escapeHtmlAttribute(title)}" />\n` +
     `    <meta property="og:description" content="${escapeHtmlAttribute(description)}" />\n` +
@@ -185,8 +294,21 @@ function injectSeo({
     `    <meta name="twitter:image" content="${escapeHtmlAttribute(ogImageUrl)}" />\n`;
 
   out = insertAfterTitle(out, snippet);
+
+  // Inject JSON-LD structured data before </head>
+  const jsonLdObjects = [...(jsonLd || [])];
+  if (breadcrumb) {
+    jsonLdObjects.push(buildBreadcrumbJsonLd(breadcrumb));
+  }
+  if (jsonLdObjects.length > 0) {
+    out = injectJsonLd(out, jsonLdObjects);
+  }
+
   return out;
 }
+
+const LOCAL_BUSINESS = buildLocalBusinessJsonLd();
+const WEB_SITE = buildWebSiteJsonLd();
 
 const pages = [
   {
@@ -194,35 +316,64 @@ const pages = [
     canonical: `${BASE_URL}/`,
     title: CATALOG_TITLE,
     description: DEFAULT_DESCRIPTION,
-    ogImageUrl: OG_IMAGE_URL_CATALOG
+    ogImageUrl: OG_IMAGE_URL_CATALOG,
+    jsonLd: [LOCAL_BUSINESS, WEB_SITE]
   },
   {
     filename: "catalog.html",
     canonical: `${BASE_URL}/`,
     title: CATALOG_TITLE,
     description: CATALOG_DESCRIPTION,
-    ogImageUrl: OG_IMAGE_URL_CATALOG
+    ogImageUrl: OG_IMAGE_URL_CATALOG,
+    jsonLd: [LOCAL_BUSINESS, WEB_SITE]
   },
   {
     filename: "gallery.html",
     canonical: `${BASE_URL}/gallery`,
     title: `Портфолио работ | ${BRAND_NAME}`,
     description: "Примеры установленных окон и дверей. Посмотрите фото наших работ в Каневской и Каневском районе.",
-    ogImageUrl: `${BASE_URL}/og-gallery-v3.png`
+    ogImageUrl: `${BASE_URL}/og-gallery-v3.png`,
+    jsonLd: [LOCAL_BUSINESS],
+    breadcrumb: [
+      { name: "Главная", url: `${BASE_URL}/` },
+      { name: "Портфолио работ", url: `${BASE_URL}/gallery` }
+    ]
   },
   {
     filename: "calculator.html",
     canonical: `${BASE_URL}/calculator`,
     title: `Калькулятор стоимости окон и дверей | ${BRAND_NAME}`,
     description: "Онлайн-расчет стоимости окон и дверей. Выберите параметры и размеры, затем отправьте заявку.",
-    ogImageUrl: `${BASE_URL}/og-calculator-v3.png`
+    ogImageUrl: `${BASE_URL}/og-calculator-v3.png`,
+    jsonLd: [LOCAL_BUSINESS],
+    breadcrumb: [
+      { name: "Главная", url: `${BASE_URL}/` },
+      { name: "Калькулятор", url: `${BASE_URL}/calculator` }
+    ]
   },
   {
     filename: "contacts.html",
     canonical: `${BASE_URL}/contacts`,
     title: `Контакты | ${BRAND_NAME}`,
     description: "Мессенджеры для связи. Напишите нам для замера и расчета.",
-    ogImageUrl: `${BASE_URL}/og-contacts-v3.png`
+    ogImageUrl: `${BASE_URL}/og-contacts-v3.png`,
+    jsonLd: [LOCAL_BUSINESS],
+    breadcrumb: [
+      { name: "Главная", url: `${BASE_URL}/` },
+      { name: "Контакты", url: `${BASE_URL}/contacts` }
+    ]
+  },
+  {
+    filename: "moskitki.html",
+    canonical: `${BASE_URL}/moskitki`,
+    title: `Москитные сетки | ${BRAND_NAME}`,
+    description: "Москитные сетки на пластиковые окна и двери. Замер и установка в Каневской и Каневском районе. Рассчитайте стоимость онлайн.",
+    ogImageUrl: OG_IMAGE_URL_CATALOG,
+    jsonLd: [LOCAL_BUSINESS],
+    breadcrumb: [
+      { name: "Главная", url: `${BASE_URL}/` },
+      { name: "Москитные сетки", url: `${BASE_URL}/moskitki` }
+    ]
   }
 ];
 
@@ -234,7 +385,9 @@ for (const page of pages) {
     description: page.description,
     canonical: page.canonical,
     ogImageUrl: page.ogImageUrl,
-    robots: "index,follow"
+    robots: "index,follow",
+    jsonLd: page.jsonLd,
+    breadcrumb: page.breadcrumb
   });
   fs.writeFileSync(outPath, nextHtml, "utf8");
 }

@@ -84,11 +84,11 @@ function AppShell(): JSX.Element {
     refetchOnWindowFocus: false,
   });
 
-  const brandName = (siteSettingsQuery.data?.brandName ?? "").trim() || "КанОкна";
+  const brandName = (siteSettingsQuery.data?.brandName ?? "").trim() || "Канокна";
 
   const lastRouteRef = useRef<string | null>(null);
 
-  const SEO_BASE_URL = "https://kanokna.web.app";
+  const SEO_BASE_URL = "https://kanokna.org";
   const SEO_CATALOG_PAGE_TITLE = `Каталог окон и дверей`;
   const SEO_CATALOG_DESCRIPTION =
     "Каталог окон, дверей и комплектующих. Выберите товар и рассчитайте стоимость в калькуляторе.";
@@ -108,17 +108,20 @@ function AppShell(): JSX.Element {
 
     let page = SEO_CATALOG_PAGE_TITLE;
     switch (routeName) {
+      case "Home":
+        page = SEO_CATALOG_PAGE_TITLE;
+        break;
       case "Catalog":
         page = SEO_CATALOG_PAGE_TITLE;
         break;
       case "Gallery":
         page = `Галерея работ`;
         break;
-      case "Faq":
-        page = t("help.title");
-        break;
       case "Calculator":
         page = `Калькулятор стоимости окон и дверей`;
+        break;
+      case "Moskitki":
+        page = `Москитные сетки`;
         break;
       case "Cart":
         page = "Корзина";
@@ -184,12 +187,16 @@ function AppShell(): JSX.Element {
 
     const ogImageUrl = (() => {
       switch (routeName) {
+        case "Home":
+          return SEO_OG_IMAGES.catalog;
         case "Catalog":
           return SEO_OG_IMAGES.catalog;
         case "Gallery":
           return SEO_OG_IMAGES.gallery;
         case "Calculator":
           return SEO_OG_IMAGES.calculator;
+        case "Moskitki":
+          return SEO_OG_IMAGES.catalog;
         case "Contacts":
           return SEO_OG_IMAGES.contacts;
         case "ProductDetails":
@@ -199,9 +206,11 @@ function AppShell(): JSX.Element {
       }
     })();
 
-    const isIndexable =
-      routeName === "Faq" ||
+const isIndexable =
+      !routeName ||
+      routeName === "Home" ||
       routeName === "Catalog" ||
+      routeName === "Moskitki" ||
       routeName === "Gallery" ||
       routeName === "Calculator" ||
       routeName === "Contacts" ||
@@ -209,13 +218,11 @@ function AppShell(): JSX.Element {
 
     const canonical = (() => {
       if (!isIndexable) return `${SEO_BASE_URL}/`;
-      if (routeName === "Faq") {
-        if (pathname.startsWith("/faq")) return `${SEO_BASE_URL}${pathname}`;
-        return `${SEO_BASE_URL}/faq`;
-      }
+      if (routeName === "Home") return `${SEO_BASE_URL}/`;
       if (routeName === "Catalog") return `${SEO_BASE_URL}/`;
       if (routeName === "Gallery") return `${SEO_BASE_URL}/gallery`;
       if (routeName === "Contacts") return `${SEO_BASE_URL}/contacts`;
+      if (routeName === "Moskitki") return `${SEO_BASE_URL}/moskitki`;
       if (routeName === "ProductDetails") {
         if (pathname.startsWith("/product/")) return `${SEO_BASE_URL}${pathname}`;
         return `${SEO_BASE_URL}/product`;
@@ -230,6 +237,11 @@ function AppShell(): JSX.Element {
 
     const { title, description } = (() => {
       switch (routeName) {
+        case "Home":
+          return {
+            title: `${SEO_CATALOG_PAGE_TITLE} | ${brandName}`,
+            description: SEO_CATALOG_DESCRIPTION
+          };
         case "Catalog":
           return {
             title: `${SEO_CATALOG_PAGE_TITLE} | ${brandName}`,
@@ -240,15 +252,15 @@ function AppShell(): JSX.Element {
             title: `Галерея работ | ${brandName}`,
             description: "Примеры установленных окон и дверей. Посмотрите фото наших работ в Каневской и Каневском районе."
           };
-        case "Faq":
-          return {
-            title: `${t("help.title")} | ${brandName}`,
-            description: t("help.subtitle")
-          };
         case "Calculator":
           return {
             title: `Калькулятор стоимости окон и дверей | ${brandName}`,
             description: "Онлайн-расчет стоимости окон и дверей. Выберите параметры и размеры, затем отправьте заявку."
+          };
+        case "Moskitki":
+          return {
+            title: `Москитные сетки | ${brandName}`,
+            description: "Москитные сетки на пластиковые окна и двери. Замер и установка в Каневской и Каневском районе."
           };
         case "Contacts":
           return {

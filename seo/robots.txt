@@ -1,5 +1,5 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://kanokna.web.app/sitemap.xml
+Sitemap: https://kanokna.org/sitemap.xml
 

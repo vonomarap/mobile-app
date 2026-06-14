@@ -177,7 +177,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, "..", "..");
 
-const SITE_URL = ensureTrailingSlash(mustEnv("SEO_SITE_URL", "https://kanokna.web.app/"));
+const SITE_URL = ensureTrailingSlash(mustEnv("SEO_SITE_URL", "https://kanokna.org/"));
 const FIREBASE_PROJECT_ID = mustEnv("SEO_FIREBASE_PROJECT_ID", "window-door-store-20260215");
 
 // Firebase CLI OAuth client credentials (public, used for localhost redirect auth code flow).

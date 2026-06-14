@@ -54,7 +54,7 @@ fi
 if [ -f "$ROOT_DIR/seo/og-image.png" ]; then
   cp "$ROOT_DIR/seo/og-image.png" "$ROOT_DIR/dist/og-image.png"
 fi
-for f in "$ROOT_DIR/seo"/google*.html; do
+for f in "$ROOT_DIR/seo"/google*.html "$ROOT_DIR/seo"/yandex*.html; do
   if [ -f "$f" ]; then
     cp "$f" "$ROOT_DIR/dist/$(basename "$f")"
   fi

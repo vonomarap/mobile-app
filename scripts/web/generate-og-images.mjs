@@ -16,7 +16,7 @@ const LOGO_SIZE = 420;
 const ogImages = [
   {
     filename: "og-image.png",
-    title: "КанОкна"
+    title: "Канокна"
   },
   {
     filename: "og-catalog.png",
@@ -94,7 +94,26 @@ ensureDistDir();
 ensureLogo();
 
 if (!hasExecutable("ffmpeg")) {
-  console.warn("OG images: ffmpeg not found; skipping generation.");
+  console.warn("OG images: ffmpeg not found; copying seo/og-image.png as fallback.");
+  const baseNames = [
+    "og-image.png",
+    "og-catalog.png",
+    "og-gallery.png",
+    "og-calculator.png",
+    "og-contacts.png"
+  ];
+  const versionSuffixes = ["-v2", "-v3"];
+  const allNames = baseNames.flatMap((name) =>
+    [name, ...versionSuffixes.map((s) => name.replace(/\.png$/i, `${s}.png`))]
+  );
+  const uniqueNames = [...new Set(allNames)];
+  for (const fn of uniqueNames) {
+    const outPath = path.join(distDir, fn);
+    if (!fs.existsSync(outPath)) {
+      fs.copyFileSync(logoPath, outPath);
+    }
+  }
+  console.log(`OG images: fallback copied to ${uniqueNames.length} files in ${distDir}`);
   process.exit(0);
 }
 
